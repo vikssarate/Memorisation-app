@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <title>Memorisation + Spaced Repetition</title>
 <style>
-:root{--bg:#0f1220;--card:#181c2f;--ink:#eef1ff;--muted:#9aa3c7;--line:#2a3052;--ok:#7bd88f;--warn:#ffd166;--bad:#ff7575;--accent:#6ca8ff}
+:root{--bg:#0f1220;--card:#181c2f;--ink:#eef1ff;--muted:#9aa3c7;--line:#2a3052;--ok:#7bd88f;--bad:#ff7575;--accent:#6ca8ff}
 *{box-sizing:border-box}
-html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;-webkit-tap-highlight-color:transparent}
 header,footer{padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
 header h1{margin:0;font-size:18px;font-weight:600}
@@ -17,7 +16,7 @@ header h1{margin:0;font-size:18px;font-weight:600}
 @media(min-width:900px){.grid{grid-template-columns:300px 1fr}}
 .btn{background:var(--accent);color:#071225;border:none;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:600}
 .btn.alt{background:#2b3258}.btn.danger{background:var(--bad)}.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
-input{background:#0f1325;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px}
+input[type="text"]{background:#0f1325;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px}
 .small{font-size:12px;color:var(--muted)}
 .badge{padding:2px 6px;border:1px solid var(--line);border-radius:6px}
 .state-intense{background:#24324f}.state-streak{background:#2a3a2a}.state-spaced{background:#2f2a3a}.state-weekly{background:#2a3440}
@@ -29,13 +28,13 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 .hr{height:1px;background:var(--line);margin:8px 0}
 .empty{color:var(--muted);font-style:italic}
 
-/* tick grid */
+/* Tick grid — native checkboxes, styled */
 .chkrow{display:flex;align-items:center;gap:10px;margin:6px 0;-webkit-user-select:none;user-select:none}
 .chklabel{width:42px;text-transform:capitalize;font-size:12px;color:var(--muted)}
-.chkgrid{display:grid;grid-template-columns:repeat(3,36px);gap:10px}
-.tick{width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:#0f1325;cursor:pointer;touch-action:manipulation}
-.tick[aria-pressed="true"]{background:var(--ok)}
-.tick[disabled]{opacity:.45;cursor:not-allowed}
+.chkgrid{display:grid;grid-template-columns:repeat(3,38px);gap:10px}
+.tick{appearance:none;-webkit-appearance:none;width:38px;height:38px;border:1px solid var(--line);border-radius:8px;background:#0f1325;display:inline-block;cursor:pointer}
+.tick:checked{background:var(--ok)}
+.tick:disabled{opacity:.45;cursor:not-allowed}
 .tick:focus{outline:2px solid #4c7cf7;outline-offset:2px}
 .count{font-size:12px;color:var(--muted);min-width:28px}
 </style>
@@ -54,7 +53,7 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 <div class="wrap grid">
   <section class="panel">
     <div style="display:flex;gap:8px">
-      <input id="newSubject" placeholder="New subject name"/>
+      <input id="newSubject" type="text" placeholder="New subject name"/>
       <button id="addSubject" class="btn">+ Subject</button>
     </div>
     <div class="hr"></div>
@@ -78,8 +77,8 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 <footer class="wrap small">Calendar-day scheduling: next due is midnight of the due day.</footer>
 
 <script>
-/* ===== helpers ===== */
-const LSK="mem_spaced_v8";
+/* ========= storage & date helpers ========= */
+const LSK="mem_spaced_v9";
 const now=()=>new Date();
 const ymd=(d=now())=>d.toISOString().slice(0,10);
 const atMidnight=d=>new Date(ymd(d));
@@ -92,7 +91,7 @@ const PERPETUAL_GAP=7;
 
 function save(){localStorage.setItem(LSK,JSON.stringify(DB));renderAll();}
 
-/* ===== model ===== */
+/* ========= models ========= */
 function createSubject(name){return{id:crypto.randomUUID(),name,topics:[]};}
 function createTopic(name){return{id:crypto.randomUUID(),name,chunks:[]};}
 function createChunk(name){
@@ -106,11 +105,11 @@ function createChunk(name){
   };
 }
 
-/* ===== dom ===== */
+/* ========= dom refs ========= */
 const $=(s,el=document)=>el.querySelector(s);
 const subjectsEl=$("#subjects"), todayDateEl=$("#todayDate"), dueCountsEl=$("#dueCounts"), todayTbody=$("#todayTable tbody"), workArea=$("#workArea");
 
-/* ===== render ===== */
+/* ========= render ========= */
 function renderAll(){todayDateEl.textContent=`— ${ymd(now())}`; renderSubjects(); renderToday();}
 
 function renderSubjects(){
@@ -127,7 +126,7 @@ function renderSubjects(){
         </span>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <input placeholder="New topic name" class="topic-name"/>
+        <input type="text" placeholder="New topic name" class="topic-name"/>
         <button class="btn" data-act="add-topic">+ Topic</button>
       </div>
       <div class="hr"></div>
@@ -147,15 +146,23 @@ function renderSubjects(){
             </span>
           </div>
           <div style="display:flex;gap:8px;margin-top:8px">
-            <input placeholder="New chunk name" class="chunk-name"/>
+            <input type="text" placeholder="New chunk name" class="chunk-name"/>
             <button class="btn" data-act="add-chunk">+ Chunk</button>
             <button class="btn ghost" data-act="bulk-demo">+ Demo 2 chunks</button>
           </div>`;
-        ti.addEventListener("pointerup",onAct(sub,t));
+        ti.addEventListener("click",(e)=>{
+          const btn=e.target.closest("[data-act]"); if(!btn) return;
+          const act=btn.dataset.act;
+          if(act==="open-topic") openTopic(sub.id,t.id);
+          if(act==="rename-topic"){const n=prompt("Rename topic",t.name); if(n){t.name=n; save();}}
+          if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){sub.topics=sub.topics.filter(x=>x.id!==t.id); save();}}
+          if(act==="add-chunk"){const n=$(".chunk-name",ti).value.trim(); if(!n) return; t.chunks.push(createChunk(n)); save();}
+          if(act==="bulk-demo"){t.chunks.push(createChunk("B1"),createChunk("B2")); save();}
+        });
         wrap.append(ti);
       });
     }
-    li.addEventListener("pointerup",(e)=>{
+    li.addEventListener("click",(e)=>{
       const btn=e.target.closest("[data-act]"); if(!btn) return;
       const act=btn.dataset.act;
       if(act==="rename-sub"){const n=prompt("Rename subject",sub.name); if(n){sub.name=n; save();}}
@@ -164,17 +171,6 @@ function renderSubjects(){
     });
     subjectsEl.append(li);
   });
-}
-function onAct(sub, t){
-  return (e)=>{
-    const btn=e.target.closest("[data-act]"); if(!btn) return;
-    const act=btn.dataset.act;
-    if(act==="open-topic") openTopic(sub.id,t.id);
-    if(act==="rename-topic"){const n=prompt("Rename topic",t.name); if(n){t.name=n; save();}}
-    if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){sub.topics=sub.topics.filter(x=>x.id!==t.id); save();}}
-    if(act==="add-chunk"){const n=$(".chunk-name",e.currentTarget).value.trim(); if(!n) return; t.chunks.push(createChunk(n)); save();}
-    if(act==="bulk-demo"){t.chunks.push(createChunk("B1"),createChunk("B2")); save();}
-  };
 }
 
 function openTopic(subId,topicId){
@@ -189,7 +185,7 @@ function openTopic(subId,topicId){
     <div class="hr"></div>
     <div id="chunkList"></div>`;
   const container=$("#chunkList",workArea);
-  if(topic.chunks.length===0){container.innerHTML='<div class="empty">No chunks yet.</div>'; return;}
+  if(topic.chunks.length===0){container.innerHTML='<div class="empty">No chunks yet.</div>';return;}
   topic.chunks.forEach(ch=>{
     const card=document.createElement("div"); card.className="card";
     card.innerHTML=`
@@ -209,31 +205,33 @@ function openTopic(subId,topicId){
 function phaseLabel(ch){return ch.phase==="intense"?"intense":ch.phase==="week_streak"?"week-streak":ch.phase==="spaced"?"spaced":"weekly";}
 function phaseClass(ch){return ch.phase==="intense"?"state-intense":ch.phase==="week_streak"?"state-streak":ch.phase==="spaced"?"state-spaced":"state-weekly";}
 
-function dayCount(arr){return arr.filter(Boolean).length;}
-function dayDone(arr){return dayCount(arr)===3;}
+function countTrue(a){return a.filter(Boolean).length;}
+function dayDone(a){return countTrue(a)===3;}
 function canWorkDay(ch,day){
   if(day==="day1") return true;
   if(day==="day2") return dayDone(ch.intense.day1);
   if(day==="day3") return dayDone(ch.intense.day2);
   return true;
 }
+
+/* Render Intense rows with native checkboxes */
 function renderChkRow(ch, dayKey, arr){
-  const count = dayCount(arr);
-  const dayEnabled = canWorkDay(ch, dayKey);
-  // Exact-3 rule: if already 3/3, disable only the unchecked ones (you can untick checked)
-  const disableUnchecked = (count>=3);
+  const n=countTrue(arr);
+  const dayEnabled=canWorkDay(ch,dayKey);
+  const disableUnchecked = (n>=3);
   return `
     <div class="chkrow">
       <span class="chklabel">${dayKey}</span>
       <div class="chkgrid">
         ${arr.map((v,i)=>{
           const dis = (!dayEnabled) || (!v && disableUnchecked);
-          return `<button type="button" class="tick" aria-pressed="${v}" ${dis?'disabled':''} data-act="tick:${dayKey}:${i}"></button>`;
+          return `<input type="checkbox" class="tick" data-act="tick:${dayKey}:${i}" ${v?'checked':''} ${dis?'disabled':''}>`;
         }).join("")}
       </div>
-      <span class="count">${count}/3</span>
+      <span class="count">${n}/3</span>
     </div>`;
 }
+
 function renderChunkBody(ch){
   if(ch.phase==="intense"){
     return `
@@ -279,50 +277,52 @@ function renderChunkBody(ch){
   return "";
 }
 
-/* ===== robust tap handling ===== */
-let ACTIVE_POINTER=null;          // pointerId we accept for the current tap
-const TAP_RESET_MS=180;
-
+/* ========= handlers (native checkbox -> single input event) ========= */
 function attachChunkHandlers(card, topic, ch){
-  card.addEventListener("pointerdown",(e)=>{
-    // Avoid scroll -> click race on iPad
-    if(!e.isPrimary) return;
-    ACTIVE_POINTER=e.pointerId;
-    e.preventDefault();
-  }, {capture:true});
+  card.addEventListener("input",(e)=>{
+    const el=e.target;
+    if(!(el instanceof HTMLInputElement)) return;
+    if(!el.dataset.act) return;
 
-  card.addEventListener("pointerup",(e)=>{
-    if(ACTIVE_POINTER===null || e.pointerId!==ACTIVE_POINTER) return;
-    const btn=e.target.closest("[data-act]"); if(!btn){ACTIVE_POINTER=null; return;}
-    const act=btn.dataset.act;
+    const [_,day,idx]=el.dataset.act.split(":");
+    const i=+idx, arr=ch.intense[day];
 
-    const commit=()=>{save(); setTimeout(()=>{ACTIVE_POINTER=null;}, TAP_RESET_MS);};
-
-    if(act==="rename"){const nm=prompt("Rename chunk",ch.name); if(nm){ch.name=nm; commit();} else {ACTIVE_POINTER=null;} return;}
-    if(act==="del"){if(confirm("Delete this chunk?")){topic.chunks=topic.chunks.filter(x=>x.id!==ch.id); commit();} else {ACTIVE_POINTER=null;} return;}
-
-    if(act.startsWith("tick:")){
-      const [_,day,idx]=act.split(":");
-      if(!canWorkDay(ch,day)){ACTIVE_POINTER=null; return;}
-      const i=+idx;
-      const arr=ch.intense[day];
-      // enforce exact-3 rule
-      const c=dayCount(arr);
-      if(!arr[i] && c>=3){ACTIVE_POINTER=null; return;} // ignore extra checks
-      arr[i]=!arr[i];
-      // if all 3 days done → move to Week-Streak
-      if(["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean))) startWeekStreak(ch);
-      commit(); return;
+    // guard day gating
+    if(!canWorkDay(ch,day)){
+      el.checked = arr[i]; // revert UI
+      return;
     }
 
-    if(act==="review-week-streak"){doWeekStreakReview(ch); commit(); return;}
-    if(act==="review-spaced"){doSpacedReview(ch); commit(); return;}
-    if(act==="review-weekly"){doWeeklyReview(ch); commit(); return;}
-    if(act==="force-due"){if(ch.phase==="spaced") ch.spaced.nextDue=ymd(now()); if(ch.phase==="weekly") ch.weekly.nextDue=ymd(now()); commit(); return;}
+    // exact-3 rule: if turning on would exceed 3, revert
+    const before=countTrue(arr);
+    const want = el.checked;
+    if(want && before>=3){
+      el.checked=false; // revert
+      return;
+    }
+
+    // commit to model
+    arr[i]=want;
+
+    // move to Week-Streak if all done
+    if(["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean))) startWeekStreak(ch);
+
+    save();
+  });
+
+  card.addEventListener("click",(e)=>{
+    const btn=e.target.closest("[data-act]"); if(!btn) return;
+    const act=btn.dataset.act;
+    if(act==="rename"){const nm=prompt("Rename chunk",ch.name); if(nm){ch.name=nm; save();}}
+    if(act==="del"){if(confirm("Delete this chunk?")){topic.chunks=topic.chunks.filter(x=>x.id!==ch.id); save();}}
+    if(act==="review-week-streak"){doWeekStreakReview(ch); save();}
+    if(act==="review-spaced"){doSpacedReview(ch); save();}
+    if(act==="review-weekly"){doWeeklyReview(ch); save();}
+    if(act==="force-due"){if(ch.phase==="spaced") ch.spaced.nextDue=ymd(now()); if(ch.phase==="weekly") ch.weekly.nextDue=ymd(now()); save();}
   });
 }
 
-/* ===== phase logic ===== */
+/* ========= phase logic ========= */
 function startWeekStreak(ch){
   ch.phase="week_streak";
   ch.weekStreak={streak:0,lastDay:null};
@@ -358,7 +358,7 @@ function doSpacedReview(ch){
 }
 function doWeeklyReview(ch){ ch.lastReviewed=ymd(now()); ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP)); }
 
-/* ===== Today ===== */
+/* ========= Today ========= */
 function collectDue(){
   const out=[];
   DB.subjects.forEach(sub=>sub.topics.forEach(topic=>topic.chunks.forEach(ch=>{
@@ -385,7 +385,7 @@ function renderToday(){
         ch.phase==="spaced" ? `<button class="btn" data-act="go-spaced:${sub.id}:${topic.id}:${ch.id}">Review</button>` :
         `<button class="btn" data-act="go-weekly:${sub.id}:${topic.id}:${ch.id}">Review</button>`
       }</td>`;
-    tr.addEventListener("pointerup",(e)=>{
+    tr.addEventListener("click",(e)=>{
       const btn=e.target.closest("[data-act]"); if(!btn){openTopic(sub.id,topic.id);return;}
       const [kind,sid,tid,cid]=btn.dataset.act.split(":");
       const S=DB.subjects.find(x=>x.id===sid), T=S.topics.find(x=>x.id===tid), C=T.chunks.find(x=>x.id===cid);
@@ -398,8 +398,8 @@ function renderToday(){
   });
 }
 
-/* ===== import/export & bootstrap ===== */
-$("#exportJson").addEventListener("pointerup",()=>{
+/* ========= import / export / bootstrap ========= */
+$("#exportJson").addEventListener("click",()=>{
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
   a.href=url; a.download=`mem_spaced_${ymd(now())}.json`; a.click(); URL.revokeObjectURL(url);
@@ -409,11 +409,14 @@ $("#importFile").addEventListener("change",(e)=>{
   const fr=new FileReader(); fr.onload=()=>{try{const data=JSON.parse(fr.result); if(!data.subjects) throw 0; DB=data; save();}catch{alert("Invalid JSON");}};
   fr.readAsText(f);
 });
-$("#addSubject").addEventListener("pointerup",()=>{const n=$("#newSubject").value.trim(); if(!n) return; DB.subjects.push(createSubject(n)); $("#newSubject").value=""; save();});
+$("#addSubject").addEventListener("click",()=>{
+  const n=$("#newSubject").value.trim(); if(!n) return;
+  DB.subjects.push(createSubject(n)); $("#newSubject").value=""; save();
+});
 
 if(DB.subjects.length===0){
-  const s=createSubject("History"); const t=createTopic("V1");
-  t.chunks.push(createChunk("B1"),createChunk("B2"),createChunk("B3"));
+  const s=createSubject("G"); const t=createTopic("R");
+  t.chunks.push(createChunk("E"));
   s.topics.push(t); DB.subjects.push(s); save();
 }else{renderAll();}
 </script>
