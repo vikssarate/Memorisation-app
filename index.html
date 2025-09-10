@@ -28,7 +28,7 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 .hr{height:1px;background:var(--line);margin:8px 0}
 .empty{color:var(--muted);font-style:italic}
 
-/* Tick grid — native checkboxes */
+/* checkbox ticks */
 .chkrow{display:flex;align-items:center;gap:10px;margin:6px 0;-webkit-user-select:none;user-select:none}
 .chklabel{width:42px;text-transform:capitalize;font-size:12px;color:var(--muted)}
 .chkgrid{display:grid;grid-template-columns:repeat(3,38px);gap:10px}
@@ -74,43 +74,66 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
   </section>
 </div>
 
-<footer class="wrap small">Calendar-day scheduling: next due is midnight of the due day.</footer>
+<footer class="wrap small">Calendar-day scheduling: next due is midnight **local time** of the due day.</footer>
 
 <script>
-/* ===== storage & dates ===== */
-const LSK="mem_spaced_v10";
+/* ===== LOCAL-DATE SAFE HELPERS ===== */
+const LSK="mem_spaced_v11";
 const now=()=>new Date();
-const ymd=(d=now())=>d.toISOString().slice(0,10);
-const atMidnight=d=>new Date(ymd(d));
-const addDays=(d,n)=>{const t=new Date(atMidnight(d));t.setDate(t.getDate()+n);return t;};
-const isPastOrToday=s=>{if(!s)return true;const due=new Date(s+"T00:00:00");return atMidnight(now())>=due;};
+// yyyy-mm-dd using LOCAL date (no UTC)
+function ymdLocal(d=now()){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), da=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${da}`;
+}
+const addDays=(d,n)=>{const t=new Date(d.getFullYear(), d.getMonth(), d.getDate()+n); return t;};
+const todayYMD=()=>ymdLocal(now());
+// Compare using local midnight
+function isPastOrToday(ymd){
+  if(!ymd) return true;
+  const due = new Date(ymd+"T00:00:00");   // local midnight
+  const today = new Date(todayYMD()+"T00:00:00");
+  return due.getTime() <= today.getTime();
+}
+
 let DB=JSON.parse(localStorage.getItem(LSK)||'{"subjects":[]}');
 
 const SCHEDULE_GROUPS=[{gap:1,reps:6},{gap:2,reps:6},{gap:3,reps:5},{gap:4,reps:4},{gap:8,reps:4},{gap:16,reps:3},{gap:28,reps:2}];
 const PERPETUAL_GAP=7;
 
-function save(){localStorage.setItem(LSK,JSON.stringify(DB));renderAll();}
+function save(){localStorage.setItem(LSK,JSON.stringify(DB)); renderAll();}
 
-/* ===== models ===== */
+/* ===== MODELS ===== */
 function createSubject(name){return{id:crypto.randomUUID(),name,topics:[]};}
 function createTopic(name){return{id:crypto.randomUUID(),name,chunks:[]};}
 function createChunk(name){
   return{
-    id:crypto.randomUUID(),name,phase:"intense",created:ymd(),
+    id:crypto.randomUUID(),name,phase:"intense",created:todayYMD(),
     intense:{day1:[false,false,false],day2:[false,false,false],day3:[false,false,false]},
     weekStreak:{streak:0,lastDay:null},
-    spaced:{groupIndex:0,repsDoneInGroup:0,nextDue:ymd(addDays(now(),1))},
+    spaced:{groupIndex:0,repsDoneInGroup:0,nextDue:ymdLocal(addDays(new Date(),1))},
     weekly:{nextDue:null},
     lastReviewed:null
   };
 }
 
-/* ===== dom ===== */
+/* ===== NORMALIZER (auto-heal) ===== */
+function intenseDone(ch){return ["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean));}
+function startWeekStreak(ch){
+  ch.phase="week_streak";
+  ch.weekStreak={streak:0,lastDay:null};
+  ch.spaced.groupIndex=0; ch.spaced.repsDoneInGroup=0; ch.spaced.nextDue=ymdLocal(addDays(new Date(),1));
+}
+function normalizeChunk(ch){
+  // If 9/9 in intense but still marked intense -> promote
+  if(ch.phase==="intense" && intenseDone(ch)){ startWeekStreak(ch); }
+}
+
+/* ===== DOM ===== */
 const $=(s,el=document)=>el.querySelector(s);
 const subjectsEl=$("#subjects"), todayDateEl=$("#todayDate"), dueCountsEl=$("#dueCounts"), todayTbody=$("#todayTable tbody"), workArea=$("#workArea");
 
-/* ===== render ===== */
-function renderAll(){todayDateEl.textContent=`— ${ymd(now())}`; renderSubjects(); renderToday();}
+/* ===== RENDER ===== */
+function renderAll(){ todayDateEl.textContent=`— ${todayYMD()}`; renderSubjects(); renderToday(); }
 
 function renderSubjects(){
   subjectsEl.innerHTML="";
@@ -187,6 +210,7 @@ function openTopic(subId,topicId){
   const container=$("#chunkList",workArea);
   if(topic.chunks.length===0){container.innerHTML='<div class="empty">No chunks yet.</div>';return;}
   topic.chunks.forEach(ch=>{
+    normalizeChunk(ch); // auto-heal
     const card=document.createElement("div"); card.className="card";
     card.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -214,7 +238,6 @@ function canWorkDay(ch,day){
   return true;
 }
 
-/* Render Intense rows with native checkboxes */
 function renderChkRow(ch, dayKey, arr){
   const n=countTrue(arr);
   const dayEnabled=canWorkDay(ch,dayKey);
@@ -242,7 +265,7 @@ function renderChunkBody(ch){
     `;
   }
   if(ch.phase==="week_streak"){
-    const due=ch.weekStreak.lastDay?ymd(addDays(new Date(ch.weekStreak.lastDay),1)):ymd(now());
+    const due=ch.weekStreak.lastDay?ymdLocal(addDays(new Date(ch.weekStreak.lastDay),1)):todayYMD();
     const ok=isPastOrToday(due);
     return `
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -264,7 +287,7 @@ function renderChunkBody(ch){
       </div>`;
   }
   if(ch.phase==="weekly"){
-    const due=ch.weekly.nextDue||ymd(now()), ok=isPastOrToday(due);
+    const due=ch.weekly.nextDue||todayYMD(), ok=isPastOrToday(due);
     return `
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="small">Weekly review every 7 days — Next: ${due}</div>
@@ -277,42 +300,30 @@ function renderChunkBody(ch){
   return "";
 }
 
-/* ===== handlers (use CHANGE, not input) ===== */
+/* ===== HANDLERS ===== */
 function attachChunkHandlers(card, topic, ch){
-  // Checkbox changes
+  // checkboxes (use CHANGE)
   card.addEventListener("change",(e)=>{
-    const el=e.target;
-    if(!(el instanceof HTMLInputElement)) return;
+    const el=e.target; if(!(el instanceof HTMLInputElement)) return;
     const act=el.dataset.act; if(!act) return;
-    const [_,day,idx]=act.split(":");
-    const i=+idx, arr=ch.intense[day];
+    const [_,day,idx]=act.split(":"); const i=+idx; const arr=ch.intense[day];
 
-    if(!canWorkDay(ch,day)){ // revert UI
-      el.checked = !!arr[i];
-      return;
-    }
+    if(!canWorkDay(ch,day)){ el.checked = !!arr[i]; return; }
 
     const before=countTrue(arr);
     const want=!!el.checked;
-
-    if(want && before>=3){ // exact-3 rule
-      el.checked=false;
-      return;
-    }
+    if(want && before>=3){ el.checked=false; return; }
 
     arr[i]=want;
 
-    // Update the small "n/3" counter live (avoid waiting for re-render)
     const cntEl = card.querySelector(`[data-count="${day}"]`);
     if(cntEl){ cntEl.textContent = `${countTrue(arr)}/3`; }
 
-    // If all 3 days done → move to Week-Streak
-    if(["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean))) startWeekStreak(ch);
-
+    if(intenseDone(ch)) startWeekStreak(ch);
     save();
   });
 
-  // Buttons
+  // buttons
   card.addEventListener("click",(e)=>{
     const btn=e.target.closest("[data-act]"); if(!btn) return;
     const act=btn.dataset.act;
@@ -321,55 +332,51 @@ function attachChunkHandlers(card, topic, ch){
     if(act==="review-week-streak"){doWeekStreakReview(ch); save();}
     if(act==="review-spaced"){doSpacedReview(ch); save();}
     if(act==="review-weekly"){doWeeklyReview(ch); save();}
-    if(act==="force-due"){if(ch.phase==="spaced") ch.spaced.nextDue=ymd(now()); if(ch.phase==="weekly") ch.weekly.nextDue=ymd(now()); save();}
+    if(act==="force-due"){if(ch.phase==="spaced") ch.spaced.nextDue=todayYMD(); if(ch.phase==="weekly") ch.weekly.nextDue=todayYMD(); save();}
   });
 }
 
-/* ===== phase logic ===== */
-function startWeekStreak(ch){
-  ch.phase="week_streak";
-  ch.weekStreak={streak:0,lastDay:null};
-  ch.spaced.groupIndex=0; ch.spaced.repsDoneInGroup=0; ch.spaced.nextDue=ymd(addDays(now(),1));
-}
+/* ===== PHASE LOGIC ===== */
 function doWeekStreakReview(ch){
-  const today=ymd(now()), last=ch.weekStreak.lastDay;
+  const today=todayYMD(), last=ch.weekStreak.lastDay;
   if(last){
-    const expected=ymd(addDays(new Date(last),1));
+    const expected=ymdLocal(addDays(new Date(last),1));
     ch.weekStreak.streak = (today===expected)?(ch.weekStreak.streak+1):1;
     ch.weekStreak.lastDay=today;
-  }else{
-    ch.weekStreak.streak=1; ch.weekStreak.lastDay=today;
-  }
+  } else { ch.weekStreak.streak=1; ch.weekStreak.lastDay=today; }
   if(ch.weekStreak.streak>=3){
     ch.phase="spaced";
     ch.spaced.groupIndex=0; ch.spaced.repsDoneInGroup=0;
-    ch.spaced.nextDue=ymd(addDays(now(),SCHEDULE_GROUPS[0].gap));
+    ch.spaced.nextDue=ymdLocal(addDays(new Date(),SCHEDULE_GROUPS[0].gap));
   }
 }
 function doSpacedReview(ch){
   const g=SCHEDULE_GROUPS[ch.spaced.groupIndex];
-  if(!g){ ch.phase="weekly"; ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP)); return; }
-  ch.lastReviewed=ymd(now()); ch.spaced.repsDoneInGroup++;
+  if(!g){ ch.phase="weekly"; ch.weekly.nextDue=ymdLocal(addDays(new Date(),PERPETUAL_GAP)); return; }
+  ch.lastReviewed=todayYMD(); ch.spaced.repsDoneInGroup++;
   if(ch.spaced.repsDoneInGroup>=g.reps){
     ch.spaced.groupIndex++; ch.spaced.repsDoneInGroup=0;
     const ng=SCHEDULE_GROUPS[ch.spaced.groupIndex];
-    if(ng) ch.spaced.nextDue=ymd(addDays(now(),ng.gap));
-    else { ch.phase="weekly"; ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP)); }
+    if(ng) ch.spaced.nextDue=ymdLocal(addDays(new Date(),ng.gap));
+    else { ch.phase="weekly"; ch.weekly.nextDue=ymdLocal(addDays(new Date(),PERPETUAL_GAP)); }
   } else {
-    ch.spaced.nextDue=ymd(addDays(now(),g.gap));
+    ch.spaced.nextDue=ymdLocal(addDays(new Date(),g.gap));
   }
 }
-function doWeeklyReview(ch){ ch.lastReviewed=ymd(now()); ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP)); }
+function doWeeklyReview(ch){ ch.lastReviewed=todayYMD(); ch.weekly.nextDue=ymdLocal(addDays(new Date(),PERPETUAL_GAP)); }
 
-/* ===== Today ===== */
+/* ===== TODAY ===== */
 function collectDue(){
   const out=[];
   DB.subjects.forEach(sub=>sub.topics.forEach(topic=>topic.chunks.forEach(ch=>{
+    normalizeChunk(ch); // auto-heal while scanning
     let due=false, phase="";
     if(ch.phase==="intense"){due=true; phase="Intense";}
-    else if(ch.phase==="week_streak"){const next=ch.weekStreak.lastDay?ymd(addDays(new Date(ch.weekStreak.lastDay),1)):ymd(now()); due=isPastOrToday(next); phase="Week-Streak";}
-    else if(ch.phase==="spaced"){due=isPastOrToday(ch.spaced.nextDue); phase="Spaced";}
-    else if(ch.phase==="weekly"){due=isPastOrToday(ch.weekly.nextDue||ymd(now())); phase="Weekly";}
+    else if(ch.phase==="week_streak"){
+      const next=ch.weekStreak.lastDay?ymdLocal(addDays(new Date(ch.weekStreak.lastDay),1)):todayYMD();
+      due=isPastOrToday(next); phase="Week-Streak";
+    } else if(ch.phase==="spaced"){due=isPastOrToday(ch.spaced.nextDue); phase="Spaced";}
+    else if(ch.phase==="weekly"){due=isPastOrToday(ch.weekly.nextDue||todayYMD()); phase="Weekly";}
     if(due) out.push({sub,topic,ch,phase});
   })));
   return out;
@@ -405,7 +412,7 @@ function renderToday(){
 $("#exportJson").addEventListener("click",()=>{
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
-  a.href=url; a.download=`mem_spaced_${ymd(now())}.json`; a.click(); URL.revokeObjectURL(url);
+  a.href=url; a.download=`mem_spaced_${todayYMD()}.json`; a.click(); URL.revokeObjectURL(url);
 });
 $("#importFile").addEventListener("change",(e)=>{
   const f=e.target.files?.[0]; if(!f) return;
