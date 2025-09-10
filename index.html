@@ -28,7 +28,7 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 .hr{height:1px;background:var(--line);margin:8px 0}
 .empty{color:var(--muted);font-style:italic}
 
-/* Tick grid — native checkboxes, styled */
+/* Tick grid — native checkboxes */
 .chkrow{display:flex;align-items:center;gap:10px;margin:6px 0;-webkit-user-select:none;user-select:none}
 .chklabel{width:42px;text-transform:capitalize;font-size:12px;color:var(--muted)}
 .chkgrid{display:grid;grid-template-columns:repeat(3,38px);gap:10px}
@@ -77,8 +77,8 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 <footer class="wrap small">Calendar-day scheduling: next due is midnight of the due day.</footer>
 
 <script>
-/* ========= storage & date helpers ========= */
-const LSK="mem_spaced_v9";
+/* ===== storage & dates ===== */
+const LSK="mem_spaced_v10";
 const now=()=>new Date();
 const ymd=(d=now())=>d.toISOString().slice(0,10);
 const atMidnight=d=>new Date(ymd(d));
@@ -91,7 +91,7 @@ const PERPETUAL_GAP=7;
 
 function save(){localStorage.setItem(LSK,JSON.stringify(DB));renderAll();}
 
-/* ========= models ========= */
+/* ===== models ===== */
 function createSubject(name){return{id:crypto.randomUUID(),name,topics:[]};}
 function createTopic(name){return{id:crypto.randomUUID(),name,chunks:[]};}
 function createChunk(name){
@@ -105,11 +105,11 @@ function createChunk(name){
   };
 }
 
-/* ========= dom refs ========= */
+/* ===== dom ===== */
 const $=(s,el=document)=>el.querySelector(s);
 const subjectsEl=$("#subjects"), todayDateEl=$("#todayDate"), dueCountsEl=$("#dueCounts"), todayTbody=$("#todayTable tbody"), workArea=$("#workArea");
 
-/* ========= render ========= */
+/* ===== render ===== */
 function renderAll(){todayDateEl.textContent=`— ${ymd(now())}`; renderSubjects(); renderToday();}
 
 function renderSubjects(){
@@ -157,7 +157,7 @@ function renderSubjects(){
           if(act==="rename-topic"){const n=prompt("Rename topic",t.name); if(n){t.name=n; save();}}
           if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){sub.topics=sub.topics.filter(x=>x.id!==t.id); save();}}
           if(act==="add-chunk"){const n=$(".chunk-name",ti).value.trim(); if(!n) return; t.chunks.push(createChunk(n)); save();}
-          if(act==="bulk-demo"){t.chunks.push(createChunk("B1"),createChunk("B2")); save();}
+          if(act==="bulk-demo"){t.chunks.push(createChunk("D"),createChunk("E")); save();}
         });
         wrap.append(ti);
       });
@@ -205,8 +205,8 @@ function openTopic(subId,topicId){
 function phaseLabel(ch){return ch.phase==="intense"?"intense":ch.phase==="week_streak"?"week-streak":ch.phase==="spaced"?"spaced":"weekly";}
 function phaseClass(ch){return ch.phase==="intense"?"state-intense":ch.phase==="week_streak"?"state-streak":ch.phase==="spaced"?"state-spaced":"state-weekly";}
 
-function countTrue(a){return a.filter(Boolean).length;}
-function dayDone(a){return countTrue(a)===3;}
+const countTrue=a=>a.filter(Boolean).length;
+const dayDone=a=>countTrue(a)===3;
 function canWorkDay(ch,day){
   if(day==="day1") return true;
   if(day==="day2") return dayDone(ch.intense.day1);
@@ -218,17 +218,17 @@ function canWorkDay(ch,day){
 function renderChkRow(ch, dayKey, arr){
   const n=countTrue(arr);
   const dayEnabled=canWorkDay(ch,dayKey);
-  const disableUnchecked = (n>=3);
+  const disableUnchecked=(n>=3);
   return `
     <div class="chkrow">
       <span class="chklabel">${dayKey}</span>
       <div class="chkgrid">
         ${arr.map((v,i)=>{
-          const dis = (!dayEnabled) || (!v && disableUnchecked);
+          const dis=(!dayEnabled)||(!v&&disableUnchecked);
           return `<input type="checkbox" class="tick" data-act="tick:${dayKey}:${i}" ${v?'checked':''} ${dis?'disabled':''}>`;
         }).join("")}
       </div>
-      <span class="count">${n}/3</span>
+      <span class="count" data-count="${dayKey}">${n}/3</span>
     </div>`;
 }
 
@@ -277,39 +277,42 @@ function renderChunkBody(ch){
   return "";
 }
 
-/* ========= handlers (native checkbox -> single input event) ========= */
+/* ===== handlers (use CHANGE, not input) ===== */
 function attachChunkHandlers(card, topic, ch){
-  card.addEventListener("input",(e)=>{
+  // Checkbox changes
+  card.addEventListener("change",(e)=>{
     const el=e.target;
     if(!(el instanceof HTMLInputElement)) return;
-    if(!el.dataset.act) return;
-
-    const [_,day,idx]=el.dataset.act.split(":");
+    const act=el.dataset.act; if(!act) return;
+    const [_,day,idx]=act.split(":");
     const i=+idx, arr=ch.intense[day];
 
-    // guard day gating
-    if(!canWorkDay(ch,day)){
-      el.checked = arr[i]; // revert UI
+    if(!canWorkDay(ch,day)){ // revert UI
+      el.checked = !!arr[i];
       return;
     }
 
-    // exact-3 rule: if turning on would exceed 3, revert
     const before=countTrue(arr);
-    const want = el.checked;
-    if(want && before>=3){
-      el.checked=false; // revert
+    const want=!!el.checked;
+
+    if(want && before>=3){ // exact-3 rule
+      el.checked=false;
       return;
     }
 
-    // commit to model
     arr[i]=want;
 
-    // move to Week-Streak if all done
+    // Update the small "n/3" counter live (avoid waiting for re-render)
+    const cntEl = card.querySelector(`[data-count="${day}"]`);
+    if(cntEl){ cntEl.textContent = `${countTrue(arr)}/3`; }
+
+    // If all 3 days done → move to Week-Streak
     if(["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean))) startWeekStreak(ch);
 
     save();
   });
 
+  // Buttons
   card.addEventListener("click",(e)=>{
     const btn=e.target.closest("[data-act]"); if(!btn) return;
     const act=btn.dataset.act;
@@ -322,7 +325,7 @@ function attachChunkHandlers(card, topic, ch){
   });
 }
 
-/* ========= phase logic ========= */
+/* ===== phase logic ===== */
 function startWeekStreak(ch){
   ch.phase="week_streak";
   ch.weekStreak={streak:0,lastDay:null};
@@ -358,7 +361,7 @@ function doSpacedReview(ch){
 }
 function doWeeklyReview(ch){ ch.lastReviewed=ymd(now()); ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP)); }
 
-/* ========= Today ========= */
+/* ===== Today ===== */
 function collectDue(){
   const out=[];
   DB.subjects.forEach(sub=>sub.topics.forEach(topic=>topic.chunks.forEach(ch=>{
@@ -398,7 +401,7 @@ function renderToday(){
   });
 }
 
-/* ========= import / export / bootstrap ========= */
+/* ===== import/export & bootstrap ===== */
 $("#exportJson").addEventListener("click",()=>{
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
@@ -415,8 +418,8 @@ $("#addSubject").addEventListener("click",()=>{
 });
 
 if(DB.subjects.length===0){
-  const s=createSubject("G"); const t=createTopic("R");
-  t.chunks.push(createChunk("E"));
+  const s=createSubject("V"); const t=createTopic("d");
+  t.chunks.push(createChunk("W"),createChunk("D"),createChunk("E"));
   s.topics.push(t); DB.subjects.push(s); save();
 }else{renderAll();}
 </script>
