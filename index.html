@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <title>Memorisation + Spaced Repetition</title>
 <style>
-:root{
-  --bg:#0f1220; --card:#181c2f; --ink:#eef1ff; --muted:#9aa3c7; --line:#2a3052; --ok:#7bd88f; --warn:#ffd166; --bad:#ff7575; --accent:#6ca8ff
-}
+:root{--bg:#0f1220;--card:#181c2f;--ink:#eef1ff;--muted:#9aa3c7;--line:#2a3052;--ok:#7bd88f;--warn:#ffd166;--bad:#ff7575;--accent:#6ca8ff}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
 header,footer{padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
@@ -17,34 +15,26 @@ header h1{margin:0;font-size:18px;font-weight:600}
 .grid{display:grid;gap:12px}
 @media(min-width:900px){.grid{grid-template-columns:300px 1fr}}
 .btn{background:var(--accent);color:#071225;border:none;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:600}
-.btn.alt{background:#2b3258}
-.btn.danger{background:var(--bad)}
-.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.alt{background:#2b3258}.btn.danger{background:var(--bad)}.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
 input,select{background:#0f1325;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px}
 .small{font-size:12px;color:var(--muted)}
-.tag{display:inline-block;background:#253056;border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:12px}
-.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.list{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow:auto}
-li{list-style:none}
-.hr{height:1px;background:var(--line);margin:8px 0}
-.kbd{font-family:ui-monospace,monospace;background:#0a1125;border:1px solid #162042;border-radius:6px;padding:1px 6px}
-.table{width:100%;border-collapse:collapse}
-.table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;font-size:14px}
 .badge{padding:2px 6px;border:1px solid var(--line);border-radius:6px}
-.state-intense{background:#24324f}
-.state-streak{background:#2a3a2a}
-.state-spaced{background:#2f2a3a}
-.state-weekly{background:#2a3440}
+.state-intense{background:#24324f}.state-streak{background:#2a3a2a}.state-spaced{background:#2f2a3a}.state-weekly{background:#2a3440}
 .card{border:1px dashed var(--line);border-radius:10px;padding:10px}
-.chkgrid{display:grid;grid-template-columns:repeat(3,24px);gap:6px}
-.checkbox{width:22px;height:22px;border:1px solid var(--line);border-radius:6px;display:inline-block;cursor:pointer;background:#0f1325}
-.checkbox.checked{background:var(--ok)}
-ul.subjects{padding:0;margin:0}
+ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow:auto}
 .subject-item{padding:8px;border:1px solid var(--line);border-radius:10px}
-.subject-item .title{font-weight:600}
 .topic-item{padding:6px 8px;margin-top:6px;border:1px dashed var(--line);border-radius:10px}
-.topic-item .row{justify-content:space-between}
+.table{width:100%;border-collapse:collapse}.table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;font-size:14px}
+.hr{height:1px;background:var(--line);margin:8px 0}
 .empty{color:var(--muted);font-style:italic}
+
+/* --- tick grid --- */
+.chkrow{display:flex;align-items:center;gap:10px;margin:6px 0}
+.chklabel{width:42px;text-transform:capitalize;font-size:12px;color:var(--muted)}
+.chkgrid{display:grid;grid-template-columns:repeat(3,28px);gap:8px}
+.tick{width:28px;height:28px;border:1px solid var(--line);border-radius:8px;background:#0f1325;cursor:pointer;touch-action:manipulation}
+.tick[aria-pressed="true"]{background:var(--ok)}
+.tick:focus{outline:2px solid #4c7cf7;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -52,517 +42,307 @@ ul.subjects{padding:0;margin:0}
   <h1>Memorisation + Spaced Repetition</h1>
   <div class="small">Intense → Week-Streak (3 days) → Spaced (1d×6,2d×6,3d×5,4d×4,8d×4,16d×3,28d×2) → Weekly (7d)</div>
   <button id="exportJson" class="btn alt">Export JSON</button>
-  <label class="row">
+  <label class="row" style="gap:8px">
     <input id="importFile" type="file" accept="application/json"/>
     <span class="small">Import JSON</span>
   </label>
 </header>
 
 <div class="wrap grid">
-  <!-- LEFT: Subjects / Topics -->
   <section class="panel">
-    <div class="row">
+    <div style="display:flex;gap:8px">
       <input id="newSubject" placeholder="New subject name"/>
       <button id="addSubject" class="btn">+ Subject</button>
     </div>
     <div class="hr"></div>
-    <ul id="subjects" class="list subjects"></ul>
+    <ul id="subjects" class="list"></ul>
   </section>
 
-  <!-- RIGHT: Today + Work Area -->
   <section class="panel">
-    <div class="row" style="justify-content:space-between">
-      <div>
-        <strong>Today</strong>
-        <span id="todayDate" class="small"></span>
-      </div>
+    <div style="display:flex;justify-content:space-between">
+      <div><strong>Today</strong> <span id="todayDate" class="small"></span></div>
       <span class="small" id="dueCounts"></span>
     </div>
     <table class="table" id="todayTable">
-      <thead><tr>
-        <th>Subject</th><th>Topic</th><th>Chunk</th><th>Phase</th><th>Action</th>
-      </tr></thead>
+      <thead><tr><th>Subject</th><th>Topic</th><th>Chunk</th><th>Phase</th><th>Action</th></tr></thead>
       <tbody></tbody>
     </table>
-
     <div class="hr"></div>
     <div id="workArea" class="card empty">Select a topic or a due chunk to work on.</div>
   </section>
 </div>
 
-<footer class="wrap small">
-  Calendar-day scheduling: next due date is set to midnight of the day after the gap (not “24h from now”).
-</footer>
+<footer class="wrap small">Calendar-day scheduling: next due date is set to midnight of the day after the gap.</footer>
 
 <script>
-/* -------------------- Storage -------------------- */
-const LSK = "mem_spaced_v5";
-const now = () => new Date();
-const ymd = (d = now()) => d.toISOString().slice(0,10);
-const atMidnight = (d) => new Date(ymd(d)); // 00:00 local (ISO is UTC; we treat as date-only logic)
-const addDays = (d, n) => {
-  const t = new Date(atMidnight(d));
-  t.setDate(t.getDate()+n);
-  return t;
-};
-const isPastOrToday = (dateStr) => {
-  if(!dateStr) return true;
-  const due = new Date(dateStr+"T00:00:00");
-  const today = atMidnight(now());
-  return due.getTime() <= today.getTime();
-};
+const LSK="mem_spaced_v6";
+const now=()=>new Date();
+const ymd=(d=now())=>d.toISOString().slice(0,10);
+const atMidnight=(d)=>new Date(ymd(d));
+const addDays=(d,n)=>{const t=new Date(atMidnight(d));t.setDate(t.getDate()+n);return t;};
+const isPastOrToday=(s)=>{if(!s)return true;const due=new Date(s+"T00:00:00");return atMidnight(now()).getTime()>=due.getTime();};
+let DB=JSON.parse(localStorage.getItem(LSK)||'{"subjects":[]}');
 
-let DB = JSON.parse(localStorage.getItem(LSK) || '{"subjects":[]}');
+const SCHEDULE_GROUPS=[{gap:1,reps:6},{gap:2,reps:6},{gap:3,reps:5},{gap:4,reps:4},{gap:8,reps:4},{gap:16,reps:3},{gap:28,reps:2}];
+const PERPETUAL_GAP=7;
 
-/* -------------------- Model Helpers -------------------- */
-const SCHEDULE_GROUPS = [
-  {gap:1, reps:6},
-  {gap:2, reps:6},
-  {gap:3, reps:5},
-  {gap:4, reps:4},
-  {gap:8, reps:4},
-  {gap:16, reps:3},
-  {gap:28, reps:2},
-];
-const PERPETUAL_GAP = 7;
-
-function save(){ localStorage.setItem(LSK, JSON.stringify(DB)); renderAll(); }
-
-function createSubject(name){
-  return { id: crypto.randomUUID(), name, topics: [] };
-}
-function createTopic(name){
-  return { id: crypto.randomUUID(), name, chunks: [] };
-}
+function save(){localStorage.setItem(LSK,JSON.stringify(DB));renderAll();}
+function createSubject(name){return{id:crypto.randomUUID(),name,topics:[]};}
+function createTopic(name){return{id:crypto.randomUUID(),name,chunks:[]};}
 function createChunk(name){
-  return {
-    id: crypto.randomUUID(),
-    name,
-    phase: "intense",                     // intense → week_streak → spaced → weekly
-    created: ymd(),
-    // Intense: need 3 days; each day 3 ticks
-    intense: {
-      day1: [false,false,false], day2: [false,false,false], day3: [false,false,false],
-      startDate: ymd() // fixes the 3-day window; UI enforces 1 row/day but not strict calendar—kept simple
-    },
-    // Week streak: 3 consecutive calendar days, 1 review/day
-    weekStreak: { streak:0, lastDay:null },
-    // Spaced:
-    spaced: { groupIndex:0, repsDoneInGroup:0, nextDue: ymd(addDays(now(),1)) },
-    // Weekly:
-    weekly: { nextDue:null },
-    lastReviewed: null
+  return{
+    id:crypto.randomUUID(),name,phase:"intense",
+    created:ymd(),
+    intense:{day1:[false,false,false],day2:[false,false,false],day3:[false,false,false],startDate:ymd()},
+    weekStreak:{streak:0,lastDay:null},
+    spaced:{groupIndex:0,repsDoneInGroup:0,nextDue:ymd(addDays(now(),1))},
+    weekly:{nextDue:null},
+    lastReviewed:null
   };
 }
 
-/* -------------------- CRUD UI -------------------- */
-const $ = (s, el=document) => el.querySelector(s);
-const subjectsEl = $("#subjects");
-const todayDateEl = $("#todayDate");
-const dueCountsEl = $("#dueCounts");
-const todayTbody = $("#todayTable tbody");
-const workArea = $("#workArea");
+const $=(s,el=document)=>el.querySelector(s);
+const subjectsEl=$("#subjects"),todayDateEl=$("#todayDate"),dueCountsEl=$("#dueCounts"),todayTbody=$("#todayTable tbody"),workArea=$("#workArea");
 
-function renderAll(){
-  todayDateEl.textContent = `— ${ymd(now())}`;
-  renderSubjects();
-  renderToday();
-}
+function renderAll(){todayDateEl.textContent=`— ${ymd(now())}`;renderSubjects();renderToday();}
 
 function renderSubjects(){
-  subjectsEl.innerHTML = "";
-  if(DB.subjects.length===0){
-    const empty = document.createElement("div");
-    empty.className="empty";
-    empty.textContent="No subjects yet. Add one above.";
-    subjectsEl.append(empty);
-    return;
-  }
+  subjectsEl.innerHTML="";
+  if(DB.subjects.length===0){subjectsEl.innerHTML='<div class="empty">No subjects yet. Add one above.</div>';return;}
   DB.subjects.forEach(sub=>{
-    const li = document.createElement("li");
-    li.className="subject-item";
-    li.innerHTML = `
-      <div class="row">
-        <span class="title">${sub.name}</span>
-        <span class="row">
+    const li=document.createElement("li");li.className="subject-item";
+    li.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="title" style="font-weight:600">${sub.name}</span>
+        <span style="display:flex;gap:6px">
           <button class="btn alt" data-act="rename-sub">Rename</button>
           <button class="btn danger" data-act="del-sub">Delete</button>
         </span>
       </div>
-      <div class="row" style="margin-top:8px">
+      <div style="display:flex;gap:8px;margin-top:8px">
         <input placeholder="New topic name" class="topic-name"/>
         <button class="btn" data-act="add-topic">+ Topic</button>
       </div>
       <div class="hr"></div>
-      <div class="list" data-topics></div>
-    `;
-    const topicsWrap = $("[data-topics]", li);
-    if(sub.topics.length===0){
-      const e = document.createElement("div");
-      e.className="empty"; e.textContent="No topics.";
-      topicsWrap.append(e);
-    } else {
+      <div class="list" data-topics></div>`;
+    const wrap=$("[data-topics]",li);
+    if(sub.topics.length===0){wrap.innerHTML='<div class="empty">No topics.</div>';}
+    else{
       sub.topics.forEach(t=>{
-        const ti = document.createElement("div");
-        ti.className="topic-item";
-        ti.innerHTML = `
-          <div class="row">
+        const ti=document.createElement("div");ti.className="topic-item";
+        ti.innerHTML=`
+          <div style="display:flex;justify-content:space-between;align-items:center">
             <span><strong>${t.name}</strong> <span class="small">(${t.chunks.length} chunks)</span></span>
-            <span class="row">
+            <span style="display:flex;gap:6px">
               <button class="btn alt" data-act="open-topic">Open</button>
               <button class="btn alt" data-act="rename-topic">Rename</button>
               <button class="btn danger" data-act="del-topic">Delete</button>
             </span>
           </div>
-          <div class="row" style="margin-top:8px">
+          <div style="display:flex;gap:8px;margin-top:8px">
             <input placeholder="New chunk name" class="chunk-name"/>
             <button class="btn" data-act="add-chunk">+ Chunk</button>
             <button class="btn ghost" data-act="bulk-demo">+ Demo 2 chunks</button>
-          </div>
-        `;
-        // attach handlers
-        ti.addEventListener("click", (e)=>{
-          const act = e.target?.dataset?.act;
-          if(!act) return;
-          if(act==="open-topic"){ openTopic(sub.id, t.id); }
-          if(act==="rename-topic"){ const name = prompt("Rename topic", t.name); if(name){ t.name=name; save(); } }
-          if(act==="del-topic"){ if(confirm("Delete topic and all its chunks?")){ sub.topics=sub.topics.filter(x=>x.id!==t.id); save(); } }
-          if(act==="add-chunk"){ 
-            const name = $(".chunk-name", ti).value.trim();
-            if(!name) return;
-            t.chunks.push(createChunk(name)); save();
-          }
-          if(act==="bulk-demo"){
-            t.chunks.push(createChunk("C1"), createChunk("C2")); save();
-          }
+          </div>`;
+        ti.addEventListener("click",(e)=>{
+          const btn=e.target.closest("[data-act]"); if(!btn) return;
+          const act=btn.dataset.act;
+          if(act==="open-topic") openTopic(sub.id,t.id);
+          if(act==="rename-topic"){const n=prompt("Rename topic",t.name);if(n){t.name=n;save();}}
+          if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){sub.topics=sub.topics.filter(x=>x.id!==t.id);save();}}
+          if(act==="add-chunk"){const n=$(".chunk-name",ti).value.trim();if(!n) return;t.chunks.push(createChunk(n));save();}
+          if(act==="bulk-demo"){t.chunks.push(createChunk("A1"),createChunk("A2"));save();}
         });
-        topicsWrap.append(ti);
+        wrap.append(ti);
       });
     }
-
     li.addEventListener("click",(e)=>{
-      const act = e.target?.dataset?.act;
-      if(!act) return;
-      if(act==="rename-sub"){ const name = prompt("Rename subject", sub.name); if(name){ sub.name=name; save(); } }
-      if(act==="del-sub"){
-        if(confirm("Delete subject and EVERYTHING inside it?")){
-          DB.subjects = DB.subjects.filter(x=>x.id!==sub.id); save();
-        }
-      }
-      if(act==="add-topic"){
-        const name = $(".topic-name", li).value.trim();
-        if(!name) return;
-        sub.topics.push(createTopic(name)); save();
-      }
+      const btn=e.target.closest("[data-act]"); if(!btn) return;
+      const act=btn.dataset.act;
+      if(act==="rename-sub"){const n=prompt("Rename subject",sub.name);if(n){sub.name=n;save();}}
+      if(act==="del-sub"){if(confirm("Delete subject and EVERYTHING?")){DB.subjects=DB.subjects.filter(x=>x.id!==sub.id);save();}}
+      if(act==="add-topic"){const n=$(".topic-name",li).value.trim();if(!n) return;sub.topics.push(createTopic(n));save();}
     });
-
     subjectsEl.append(li);
   });
 }
 
-function openTopic(subId, topicId){
-  const sub = DB.subjects.find(s=>s.id===subId);
-  const topic = sub?.topics.find(t=>t.id===topicId);
-  if(!topic){ workArea.textContent="Topic not found"; return; }
+function openTopic(subId,topicId){
+  const sub=DB.subjects.find(s=>s.id===subId); const topic=sub?.topics.find(t=>t.id===topicId);
+  if(!topic){workArea.textContent="Topic not found";return;}
   workArea.classList.remove("empty");
-  workArea.innerHTML = `
-    <div class="row" style="justify-content:space-between">
-      <div><strong>${sub.name}</strong> → <strong>${topic.name}</strong></div>
-      <div class="small">Chunks: ${topic.chunks.length}</div>
-    </div>
+  workArea.innerHTML=`
+    <div style="display:flex;justify-content:space-between"><div><strong>${sub.name}</strong> → <strong>${topic.name}</strong></div><div class="small">Chunks: ${topic.chunks.length}</div></div>
     <div class="hr"></div>
-    <div id="chunkList"></div>
-  `;
-  const container = $("#chunkList", workArea);
-  if(topic.chunks.length===0){
-    const e=document.createElement("div"); e.className="empty"; e.textContent="No chunks yet."; container.append(e); return;
-  }
+    <div id="chunkList"></div>`;
+  const container=$("#chunkList",workArea);
+  if(topic.chunks.length===0){container.innerHTML='<div class="empty">No chunks yet.</div>';return;}
   topic.chunks.forEach(ch=>{
-    const card = document.createElement("div");
-    card.className="card";
-    const phaseBadge = phaseLabel(ch);
-    card.innerHTML = `
-      <div class="row" style="justify-content:space-between;margin-bottom:6px">
-        <div><strong>${ch.name}</strong> <span class="badge ${phaseClass(ch)}">${phaseBadge}</span></div>
-        <div class="row">
+    const card=document.createElement("div");card.className="card";
+    card.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div><strong>${ch.name}</strong> <span class="badge ${ch.phase==='intense'?'state-intense':ch.phase==='week_streak'?'state-streak':ch.phase==='spaced'?'state-spaced':'state-weekly'}">${phaseLabel(ch)}</span></div>
+        <div style="display:flex;gap:6px">
           <button class="btn alt" data-act="rename">Rename</button>
           <button class="btn danger" data-act="del">Delete</button>
         </div>
       </div>
-      ${renderChunkBody(ch)}
-    `;
+      ${renderChunkBody(ch)}`;
     card.addEventListener("click",(e)=>{
-      const act = e.target?.dataset?.act;
-      if(!act) return;
-      if(act==="rename"){ const nm=prompt("Rename chunk", ch.name); if(nm){ ch.name=nm; save(); } }
-      if(act==="del"){ if(confirm("Delete this chunk?")){ topic.chunks = topic.chunks.filter(x=>x.id!==ch.id); save(); } }
-      // Intense day ticks
+      const btn=e.target.closest("[data-act]"); if(!btn) return;
+      const act=btn.dataset.act;
+      if(act==="rename"){const nm=prompt("Rename chunk",ch.name);if(nm){ch.name=nm;save();}}
+      if(act==="del"){if(confirm("Delete this chunk?")){topic.chunks=topic.chunks.filter(x=>x.id!==ch.id);save();}}
       if(act.startsWith("tick:")){
-        const [_,day,idx] = act.split(":"); ch.intense[day][+idx]=!ch.intense[day][+idx]; save();
-        if(intenseDone(ch)){ startWeekStreak(ch); save(); }
+        const [_,day,idx]=act.split(":"); ch.intense[day][+idx]=!ch.intense[day][+idx]; save();
+        if(intenseDone(ch)){startWeekStreak(ch); save();}
       }
-      if(act==="review-week-streak"){ doWeekStreakReview(ch); save(); }
-      if(act==="review-spaced"){ doSpacedReview(ch); save(); }
-      if(act==="review-weekly"){ doWeeklyReview(ch); save(); }
-      if(act==="force-due"){ // debug helper
-        if(ch.phase==="spaced") ch.spaced.nextDue = ymd(now());
-        if(ch.phase==="weekly") ch.weekly.nextDue = ymd(now());
-        save();
-      }
+      if(act==="review-week-streak"){doWeekStreakReview(ch); save();}
+      if(act==="review-spaced"){doSpacedReview(ch); save();}
+      if(act==="review-weekly"){doWeeklyReview(ch); save();}
+      if(act==="force-due"){if(ch.phase==="spaced") ch.spaced.nextDue=ymd(now()); if(ch.phase==="weekly") ch.weekly.nextDue=ymd(now()); save();}
     });
     container.append(card);
   });
 }
 
-/* -------------------- Phase Renderers -------------------- */
-function phaseLabel(ch){
-  if(ch.phase==="intense") return "intense";
-  if(ch.phase==="week_streak") return "week-streak";
-  if(ch.phase==="spaced") return "spaced";
-  if(ch.phase==="weekly") return "weekly";
-  return ch.phase;
-}
-function phaseClass(ch){
-  return ch.phase==="intense"?"state-intense":ch.phase==="week_streak"?"state-streak":ch.phase==="spaced"?"state-spaced":"state-weekly";
-}
-function renderChkRow(dayKey, arr){
+function phaseLabel(ch){return ch.phase==="intense"?"intense":ch.phase==="week_streak"?"week-streak":ch.phase==="spaced"?"spaced":"weekly";}
+function renderChkRow(dayKey,arr){
   return `
-    <div class="row" style="align-items:center;gap:10px">
-      <span class="small" style="width:42px;text-transform:capitalize">${dayKey}</span>
-      <span class="chkgrid">
-        ${arr.map((v,i)=>`<span class="checkbox ${v?'checked':''}" data-act="tick:${dayKey}:${i}"></span>`).join("")}
-      </span>
+    <div class="chkrow">
+      <span class="chklabel">${dayKey}</span>
+      <div class="chkgrid">
+        ${arr.map((v,i)=>`<button type="button" class="tick" aria-pressed="${v}" data-act="tick:${dayKey}:${i}"></button>`).join("")}
+      </div>
       <span class="small">Mark 3 boxes for this day</span>
-    </div>
-  `;
+    </div>`;
 }
 function renderChunkBody(ch){
   if(ch.phase==="intense"){
     return `
       <div class="small" style="margin-bottom:6px">Complete 3×3 over 3 days. When all 9 are checked, this chunk enters Week-Streak.</div>
-      ${renderChkRow("day1", ch.intense.day1)}
-      ${renderChkRow("day2", ch.intense.day2)}
-      ${renderChkRow("day3", ch.intense.day3)}
+      ${renderChkRow("day1",ch.intense.day1)}
+      ${renderChkRow("day2",ch.intense.day2)}
+      ${renderChkRow("day3",ch.intense.day3)}
     `;
   }
   if(ch.phase==="week_streak"){
-    const due = ch.weekStreak.lastDay ? ymd(addDays(new Date(ch.weekStreak.lastDay),1)) : ymd(now());
-    const status = `Streak ${ch.weekStreak.streak}/3 — Next due: ${due}`;
-    const ok = isPastOrToday(due);
+    const due=ch.weekStreak.lastDay?ymd(addDays(new Date(ch.weekStreak.lastDay),1)):ymd(now());
+    const ok=isPastOrToday(due);
     return `
-      <div class="row" style="justify-content:space-between">
-        <div class="small">${status}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="small">Streak ${ch.weekStreak.streak}/3 — Next due: ${due}</div>
         <button class="btn ${ok?'':'ghost'}" data-act="review-week-streak" ${ok?'':'disabled'}>Review today</button>
-      </div>
-    `;
+      </div>`;
   }
   if(ch.phase==="spaced"){
-    const g = SCHEDULE_GROUPS[ch.spaced.groupIndex];
-    const label = g ? `${g.gap}d gap (${ch.spaced.repsDoneInGroup}/${g.reps})` : "completed";
-    const due = ch.spaced.nextDue;
-    const ok = isPastOrToday(due);
+    const g=SCHEDULE_GROUPS[ch.spaced.groupIndex];
+    const label=g?`${g.gap}d gap (${ch.spaced.repsDoneInGroup}/${g.reps})`:"completed";
+    const due=ch.spaced.nextDue, ok=isPastOrToday(due);
     return `
-      <div class="row" style="justify-content:space-between">
+      <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="small">Next: ${due} — ${label}</div>
-        <div class="row">
+        <div style="display:flex;gap:6px">
           <button class="btn ${ok?'':'ghost'}" data-act="review-spaced" ${ok?'':'disabled'}>Review</button>
-          <button class="btn ghost" data-act="force-due">Force due (debug)</button>
+          <button class="btn ghost" data-act="force-due">Force due</button>
         </div>
-      </div>
-    `;
+      </div>`;
   }
   if(ch.phase==="weekly"){
-    const due = ch.weekly.nextDue || ymd(now());
-    const ok = isPastOrToday(due);
+    const due=ch.weekly.nextDue||ymd(now()), ok=isPastOrToday(due);
     return `
-      <div class="row" style="justify-content:space-between">
+      <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="small">Weekly review every 7 days — Next: ${due}</div>
-        <div class="row">
+        <div style="display:flex;gap:6px">
           <button class="btn ${ok?'':'ghost'}" data-act="review-weekly" ${ok?'':'disabled'}>Review</button>
-          <button class="btn ghost" data-act="force-due">Force due (debug)</button>
+          <button class="btn ghost" data-act="force-due">Force due</button>
         </div>
-      </div>
-    `;
+      </div>`;
   }
   return "";
 }
 
-/* -------------------- Phase Logic -------------------- */
-// Intense completion = all 9 boxes checked
-function intenseDone(ch){
-  const ok = (arr)=>arr.every(Boolean);
-  return ok(ch.intense.day1)&&ok(ch.intense.day2)&&ok(ch.intense.day3);
-}
-function startWeekStreak(ch){
-  ch.phase="week_streak";
-  ch.weekStreak={streak:0,lastDay:null};
-  ch.spaced.nextDue = ymd(addDays(now(),1)); // will be used later
-}
+/* ---- Phase logic ---- */
+function intenseDone(ch){const ok=a=>a.every(Boolean);return ok(ch.intense.day1)&&ok(ch.intense.day2)&&ok(ch.intense.day3);}
+function startWeekStreak(ch){ch.phase="week_streak";ch.weekStreak={streak:0,lastDay:null};ch.spaced.nextDue=ymd(addDays(now(),1));}
 function doWeekStreakReview(ch){
-  const today = ymd(now());
-  const last = ch.weekStreak.lastDay;
-  if(last){
-    const expected = ymd(addDays(new Date(last),1));
-    if(today!==expected){
-      // missed a day → reset to 1
-      ch.weekStreak.streak = 1;
-      ch.weekStreak.lastDay = today;
-    } else {
-      ch.weekStreak.streak += 1;
-      ch.weekStreak.lastDay = today;
-    }
-  } else {
-    ch.weekStreak.streak = 1;
-    ch.weekStreak.lastDay = today;
-  }
-  if(ch.weekStreak.streak>=3){
-    // move to spaced
-    ch.phase="spaced";
-    ch.spaced.groupIndex=0;
-    ch.spaced.repsDoneInGroup=0;
-    ch.spaced.nextDue = ymd(addDays(now(), SCHEDULE_GROUPS[0].gap));
-  }
+  const today=ymd(now());const last=ch.weekStreak.lastDay;
+  if(last){const expected=ymd(addDays(new Date(last),1)); ch.weekStreak.streak = (today===expected)?(ch.weekStreak.streak+1):1; ch.weekStreak.lastDay=today;}
+  else {ch.weekStreak.streak=1; ch.weekStreak.lastDay=today;}
+  if(ch.weekStreak.streak>=3){ch.phase="spaced";ch.spaced.groupIndex=0;ch.spaced.repsDoneInGroup=0;ch.spaced.nextDue=ymd(addDays(now(),SCHEDULE_GROUPS[0].gap));}
 }
-// Spaced review advancement
 function doSpacedReview(ch){
-  const today = ymd(now());
-  const group = SCHEDULE_GROUPS[ch.spaced.groupIndex];
-  if(!group){
-    // should not happen — already complete
-    ch.phase="weekly";
-    ch.weekly.nextDue = ymd(addDays(now(), PERPETUAL_GAP));
-    save(); return;
-  }
-  ch.lastReviewed = today;
-  ch.spaced.repsDoneInGroup += 1;
-  if(ch.spaced.repsDoneInGroup >= group.reps){
-    // advance to next group
-    ch.spaced.groupIndex += 1;
-    ch.spaced.repsDoneInGroup = 0;
-    const nextGroup = SCHEDULE_GROUPS[ch.spaced.groupIndex];
-    if(nextGroup){
-      ch.spaced.nextDue = ymd(addDays(now(), nextGroup.gap));
-    } else {
-      // enter weekly mode
-      ch.phase="weekly";
-      ch.weekly.nextDue = ymd(addDays(now(), PERPETUAL_GAP));
-    }
+  const g=SCHEDULE_GROUPS[ch.spaced.groupIndex];
+  if(!g){ch.phase="weekly";ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP));return;}
+  ch.lastReviewed=ymd(now()); ch.spaced.repsDoneInGroup++;
+  if(ch.spaced.repsDoneInGroup>=g.reps){
+    ch.spaced.groupIndex++; ch.spaced.repsDoneInGroup=0;
+    const ng=SCHEDULE_GROUPS[ch.spaced.groupIndex];
+    if(ng){ch.spaced.nextDue=ymd(addDays(now(),ng.gap));}
+    else {ch.phase="weekly";ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP));}
   } else {
-    // stay in same group
-    ch.spaced.nextDue = ymd(addDays(now(), group.gap));
+    ch.spaced.nextDue=ymd(addDays(now(),g.gap));
   }
 }
-// Weekly perpetual
-function doWeeklyReview(ch){
-  ch.lastReviewed = ymd(now());
-  ch.weekly.nextDue = ymd(addDays(now(), PERPETUAL_GAP));
-}
+function doWeeklyReview(ch){ch.lastReviewed=ymd(now());ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP));}
 
-/* -------------------- Today Due -------------------- */
+/* ---- Today ---- */
 function collectDue(){
-  const due = [];
-  DB.subjects.forEach(sub=>{
-    sub.topics.forEach(topic=>{
-      topic.chunks.forEach(ch=>{
-        let isDue=false, phase=""; 
-        if(ch.phase==="week_streak"){
-          const next = ch.weekStreak.lastDay ? ymd(addDays(new Date(ch.weekStreak.lastDay),1)) : ymd(now());
-          isDue = isPastOrToday(next); phase="Week-Streak";
-        } else if(ch.phase==="spaced"){
-          isDue = isPastOrToday(ch.spaced.nextDue); phase="Spaced";
-        } else if(ch.phase==="weekly"){
-          isDue = isPastOrToday(ch.weekly.nextDue || ymd(now())); phase="Weekly";
-        } else if(ch.phase==="intense"){
-          // always “actionable” until finished
-          isDue = true; phase="Intense";
-        }
-        if(isDue){
-          due.push({sub, topic, ch, phase});
-        }
-      });
-    });
-  });
+  const due=[];
+  DB.subjects.forEach(sub=>sub.topics.forEach(topic=>topic.chunks.forEach(ch=>{
+    let isDue=false,phase="";
+    if(ch.phase==="week_streak"){const next=ch.weekStreak.lastDay?ymd(addDays(new Date(ch.weekStreak.lastDay),1)):ymd(now());isDue=isPastOrToday(next);phase="Week-Streak";}
+    else if(ch.phase==="spaced"){isDue=isPastOrToday(ch.spaced.nextDue);phase="Spaced";}
+    else if(ch.phase==="weekly"){isDue=isPastOrToday(ch.weekly.nextDue||ymd(now()));phase="Weekly";}
+    else if(ch.phase==="intense"){isDue=true;phase="Intense";}
+    if(isDue) due.push({sub,topic,ch,phase});
+  })));
   return due;
 }
 function renderToday(){
-  const rows = collectDue();
-  todayTbody.innerHTML = "";
-  if(rows.length===0){
-    const tr=document.createElement("tr");
-    const td=document.createElement("td"); td.colSpan=5; td.className="small"; td.textContent="Nothing due today.";
-    tr.append(td); todayTbody.append(tr); dueCountsEl.textContent="";
-    return;
-  }
-  dueCountsEl.textContent = `${rows.length} due`;
+  const rows=collectDue(); todayTbody.innerHTML="";
+  if(rows.length===0){todayTbody.innerHTML='<tr><td colspan="5" class="small">Nothing due today.</td></tr>'; dueCountsEl.textContent=""; return;}
+  dueCountsEl.textContent=`${rows.length} due`;
   rows.forEach(({sub,topic,ch,phase})=>{
     const tr=document.createElement("tr");
-    tr.innerHTML = `
-      <td>${sub.name}</td>
-      <td>${topic.name}</td>
-      <td>${ch.name}</td>
-      <td>${phase}</td>
-      <td>
-        ${ch.phase==="intense" ? `<span class="small">Open chunk to tick 3×3</span>` :
-          ch.phase==="week_streak" ? `<button class="btn" data-act="go-week:${sub.id}:${topic.id}:${ch.id}">Review</button>` :
-          ch.phase==="spaced" ? `<button class="btn" data-act="go-spaced:${sub.id}:${topic.id}:${ch.id}">Review</button>` :
-          `<button class="btn" data-act="go-weekly:${sub.id}:${topic.id}:${ch.id}">Review</button>`
-        }
-      </td>
-    `;
+    tr.innerHTML=`
+      <td>${sub.name}</td><td>${topic.name}</td><td>${ch.name}</td><td>${phase}</td>
+      <td>${
+        ch.phase==="intense" ? '<span class="small">Open chunk to tick 3×3</span>' :
+        ch.phase==="week_streak" ? `<button class="btn" data-act="go-week:${sub.id}:${topic.id}:${ch.id}">Review</button>` :
+        ch.phase==="spaced" ? `<button class="btn" data-act="go-spaced:${sub.id}:${topic.id}:${ch.id}">Review</button>` :
+        `<button class="btn" data-act="go-weekly:${sub.id}:${topic.id}:${ch.id}">Review</button>`
+      }</td>`;
     tr.addEventListener("click",(e)=>{
-      const act = e.target?.dataset?.act;
-      if(!act) { openTopic(sub.id, topic.id); return; }
-      const [kind, sid, tid, cid] = act.split(":");
-      const S = DB.subjects.find(x=>x.id===sid);
-      const T = S.topics.find(x=>x.id===tid);
-      const C = T.chunks.find(x=>x.id===cid);
-      if(kind==="go-week"){ doWeekStreakReview(C); save(); }
-      if(kind==="go-spaced"){ doSpacedReview(C); save(); }
-      if(kind==="go-weekly"){ doWeeklyReview(C); save(); }
+      const btn=e.target.closest("[data-act]"); if(!btn){openTopic(sub.id,topic.id);return;}
+      const [kind,sid,tid,cid]=btn.dataset.act.split(":");
+      const S=DB.subjects.find(x=>x.id===sid), T=S.topics.find(x=>x.id===tid), C=T.chunks.find(x=>x.id===cid);
+      if(kind==="go-week") {doWeekStreakReview(C); save();}
+      if(kind==="go-spaced"){doSpacedReview(C); save();}
+      if(kind==="go-weekly"){doWeeklyReview(C); save();}
     });
     todayTbody.append(tr);
   });
 }
 
-/* -------------------- Import / Export -------------------- */
-$("#exportJson").addEventListener("click", ()=>{
-  const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = `mem_spaced_${ymd(now())}.json`; a.click();
-  URL.revokeObjectURL(url);
+/* ---- Import/Export & bootstrap ---- */
+$("#exportJson").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=`mem_spaced_${ymd(now())}.json`; a.click(); URL.revokeObjectURL(url);
 });
-$("#importFile").addEventListener("change", (e)=>{
-  const f = e.target.files?.[0]; if(!f) return;
-  const fr = new FileReader();
-  fr.onload = () => {
-    try{
-      const data = JSON.parse(fr.result);
-      if(!data.subjects) throw new Error("Invalid file");
-      DB = data; save();
-    }catch(err){ alert("Invalid JSON"); }
-  };
+$("#importFile").addEventListener("change",(e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  const fr=new FileReader(); fr.onload=()=>{try{const data=JSON.parse(fr.result); if(!data.subjects) throw 0; DB=data; save();}catch{alert("Invalid JSON");}};
   fr.readAsText(f);
 });
+$("#addSubject").addEventListener("click",()=>{const n=$("#newSubject").value.trim(); if(!n) return; DB.subjects.push(createSubject(n)); $("#newSubject").value=""; save();});
 
-/* -------------------- Add Subject -------------------- */
-$("#addSubject").addEventListener("click", ()=>{
-  const name = $("#newSubject").value.trim();
-  if(!name) return;
-  DB.subjects.push(createSubject(name)); $("#newSubject").value=""; save();
-});
-
-/* -------------------- Bootstrap -------------------- */
 if(DB.subjects.length===0){
-  // Seed with one subject & topic to help first run
-  const s = createSubject("History");
-  const t = createTopic("Freedom fighter Nick Names");
-  s.topics.push(t);
-  DB.subjects.push(s);
-  save();
-} else {
-  renderAll();
-}
+  const s=createSubject("History"); const t=createTopic("C1");
+  t.chunks.push(createChunk("A1"),createChunk("A2"),createChunk("A3"));
+  s.topics.push(t); DB.subjects.push(s); save();
+}else{renderAll();}
 </script>
 </body>
 </html>
