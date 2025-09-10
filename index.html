@@ -7,7 +7,7 @@
 <style>
 :root{
   --bg:#0f1220; --card:#181c2f; --ink:#eef1ff; --muted:#9aa3c7; --line:#2a3052; --accent:#6ca8ff;
-  --good:#79e1a7; --warn:#ffd166; --bad:#ff8080; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.25);
+  --good:#79e1a7; --warn:#ffd166; --bad:#ff8080; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.25)
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -16,7 +16,7 @@ header,footer{padding:10px 14px;display:flex;align-items:center;gap:10px}
 header{justify-content:space-between;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.04),transparent)}
 h1{margin:0;font-size:18px;font-weight:600}
 small.muted{color:var(--muted)}
-.wrap{max-width:1200px;margin:0 auto;padding:12px;display:grid;gap:12px;grid-template-columns:260px 1fr}
+.wrap{max-width:1200px;margin:0 auto;padding:12px;display:grid;gap:12px;grid-template-columns:280px 1fr}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .pad{padding:12px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -37,8 +37,6 @@ hr.sep{border:0;border-top:1px dashed var(--line);margin:10px 0}
 .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;align-items:center}
 .grid{display:grid;gap:10px}
 .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
-.grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
-.grid.cols-5{grid-template-columns:repeat(5,minmax(0,1fr))}
 .box{border:1px solid var(--line);border-radius:10px;padding:10px}
 h2{margin:4px 0 8px 0;font-size:16px}
 h3{margin:4px 0 6px 0;font-size:14px;color:var(--muted)}
@@ -47,7 +45,6 @@ label.cb input{width:18px;height:18px}
 table{width:100%;border-collapse:separate;border-spacing:0 8px}
 td,th{padding:8px 10px;text-align:left}
 tr{background:#0e1422;border:1px solid var(--line)}
-tr.overdue{outline:2px solid var(--bad)}
 tr.today{outline:2px solid var(--accent)}
 .badge{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
 .smallmuted{font-size:12px;color:var(--muted)}
@@ -58,7 +55,7 @@ tr.today{outline:2px solid var(--accent)}
 <header>
   <div class="row">
     <h1>Memorisation + Spaced Repetition</h1>
-    <small class="muted">3×/day × 3 days → Week Box → 1/day → Spaced: 1,2,3,4,8,16,28 days</small>
+    <small class="muted">3×/day × 3 days → Week Box (1/day) → Spaced: 1,2,3,4,8,16,28 days</small>
   </div>
   <div class="row">
     <button class="btn small" id="exportBtn">Export JSON</button>
@@ -69,7 +66,7 @@ tr.today{outline:2px solid var(--accent)}
 </header>
 
 <div class="wrap">
-  <!-- LEFT: tree -->
+  <!-- LEFT: subjects & topics -->
   <aside class="card pad sidebar" id="tree"></aside>
 
   <!-- RIGHT: main -->
@@ -87,7 +84,7 @@ tr.today{outline:2px solid var(--accent)}
     </section>
 
     <section class="card pad" id="topicView">
-      <h2 id="topicTitle">Current Topic</h2>
+      <h2 id="topicTitle">No topic selected</h2>
       <div id="topicControls" class="row"></div>
       <hr class="sep" />
       <div id="chunks"></div>
@@ -110,10 +107,7 @@ const $ = (s, d=document)=>d.querySelector(s);
 const $$ = (s, d=document)=>[...d.querySelectorAll(s)];
 const uid = ()=>crypto.randomUUID();
 const todayISO = ()=> new Date().toISOString().slice(0,10);
-const addDays = (iso, n)=>{
-  const d = new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n);
-  return d.toISOString().slice(0,10);
-};
+const addDays = (iso, n)=>{ const d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 const cmpISO = (a,b)=> (a<b?-1:a>b?1:0);
 const niceDate = iso => new Date(iso+"T00:00:00").toLocaleDateString();
 
@@ -124,69 +118,69 @@ const DEFAULT_INTERVALS = [1,2,3,4,8,16,28];
 let db = load() || seed();
 
 function seed(){
-  const s1 = {id:uid(), name:"Sample Subject", topics:[
-    {id:uid(), name:"Sample Topic", spacedActive:false, spacedRoundIndex:0, chunks:[
-      mkChunk("Chunk 1"), mkChunk("Chunk 2"), mkChunk("Chunk 3")
-    ]}
-  ]};
-  return {subjects:[s1], current:{subjectId:s1.id, topicId:s1.topics[0].id}};
+  const s1 = {id:uid(), name:"History", topics:[]};
+  return {subjects:[s1], current:{subjectId:s1.id, topicId:""}};
 }
 function mkChunk(name){
   return {
     id:uid(), name,
-    phase:"intense",                         // intense → weekbox → spaced
-    intense:{grid:Array.from({length:3},()=>Array(3).fill(false))}, // 3×3
+    phase:"intense",
+    intense:{grid:Array.from({length:3},()=>Array(3).fill(false))},
     weekbox:{last:"", next:todayISO()},
-    spaced:{index:0, last:"", next:""},     // index=0..6; next due date
+    spaced:{index:0, last:"", next:""},
     history:[]
   };
 }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
 function load(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||""); }catch{ return null } }
 
-/* -------------------- Tree Rendering -------------------- */
+/* -------------------- Sidebar: Subjects + Topics -------------------- */
 function renderTree(){
   const el = $("#tree"); el.innerHTML = "";
-  const h = document.createElement("div");
-  h.innerHTML = `
+
+  // Header
+  const head = document.createElement("div");
+  head.innerHTML = `
     <div class="row" style="justify-content:space-between">
       <h2 style="margin:0">Subjects</h2>
-      <button class="btn small ghost" id="newTopicBtn">+ Topic</button>
+      <button class="btn small ghost" id="addTopicTopBtn">+ Topic</button>
     </div>
     <hr class="sep" />
   `;
-  el.appendChild(h);
+  el.appendChild(head);
 
+  // Subjects list
   const ul = document.createElement("ul");
   db.subjects.forEach(sub=>{
     const liS = document.createElement("li");
-    const head = document.createElement("div");
-    head.className = "item";
-    head.innerHTML = `
+
+    const sRow = document.createElement("div");
+    sRow.className = "item";
+    sRow.innerHTML = `
       <div class="name">${sub.name}</div>
       <div class="row">
         <span class="tag">${sub.topics.length} topics</span>
         <button class="btn small ghost" data-act="ren-sub" data-id="${sub.id}">✏️</button>
         <button class="btn small bad" data-act="del-sub" data-id="${sub.id}">🗑</button>
+        <button class="btn small" data-act="open-sub" data-id="${sub.id}">Open</button>
       </div>
     `;
-    liS.appendChild(head);
+    liS.appendChild(sRow);
 
+    // Topics under each subject
     const ulT = document.createElement("ul");
     sub.topics.forEach(t=>{
-      const liT = document.createElement("li");
       const active = (db.current.subjectId===sub.id && db.current.topicId===t.id) ? "active" : "";
+      const liT = document.createElement("li");
       liT.innerHTML = `
         <div class="item ${active}">
           <div class="name">↳ ${t.name}</div>
           <div class="row">
-            <span class="tag">${t.chunks.length} chunks</span>
             <button class="btn small ghost" data-act="ren-topic" data-id="${t.id}">✏️</button>
             <button class="btn small bad" data-act="del-topic" data-id="${t.id}">🗑</button>
             <button class="btn small" data-act="open-topic" data-sid="${sub.id}" data-tid="${t.id}">Open</button>
           </div>
-        </div>
-      `;
+        </div>`;
       ulT.appendChild(liT);
     });
     liS.appendChild(ulT);
@@ -194,27 +188,44 @@ function renderTree(){
   });
   el.appendChild(ul);
 
-  // handlers
+  // Top "+ Topic" (for the currently open subject)
+  $("#addTopicTopBtn").onclick = ()=>{
+    const s = getCurrentSubject();
+    if(!s){ alert("Open or create a subject first."); return; }
+    const name = prompt("New topic name:");
+    if(!name) return;
+    s.topics.push({id:uid(), name, spacedActive:false, spacedRoundIndex:0, chunks:[]});
+    db.current.topicId = s.topics[s.topics.length-1].id;
+    save(); renderAll();
+  };
+
+  // Subject/Topic actions
   el.onclick = (e)=>{
     const btn = e.target.closest("button"); if(!btn) return;
     const act = btn.dataset.act;
-    if(act==="ren-sub"){
+
+    if(act==="open-sub"){
+      db.current.subjectId = btn.dataset.id;
+      const s = getSubject(btn.dataset.id);
+      db.current.topicId = s.topics[0]?.id || "";
+      save(); renderAll();
+    }else if(act==="ren-sub"){
       const s = getSubject(btn.dataset.id);
       const name = prompt("Rename subject:", s.name); if(name){ s.name=name; save(); renderAll(); }
     }else if(act==="del-sub"){
-      if(confirm("Delete subject and all its topics?")){
-        db.subjects = db.subjects.filter(s=>s.id!==btn.dataset.id);
-        save(); renderAll();
-      }
+      if(!confirm("Delete subject and ALL its topics/chunks?")) return;
+      db.subjects = db.subjects.filter(x=>x.id!==btn.dataset.id);
+      if(db.current.subjectId===btn.dataset.id){ db.current.subjectId=""; db.current.topicId=""; }
+      save(); renderAll();
     }else if(act==="ren-topic"){
       const t = getTopic(btn.dataset.id);
       const name = prompt("Rename topic:", t.name); if(name){ t.name=name; save(); renderAll(); }
     }else if(act==="del-topic"){
-      if(confirm("Delete topic and its chunks?")){
-        const {subject} = findTopic(btn.dataset.id);
-        subject.topics = subject.topics.filter(t=>t.id!==btn.dataset.id);
-        save(); renderAll();
-      }
+      if(!confirm("Delete this topic and its chunks?")) return;
+      const {subject} = findTopic(btn.dataset.id);
+      subject.topics = subject.topics.filter(x=>x.id!==btn.dataset.id);
+      if(db.current.topicId===btn.dataset.id){ db.current.topicId = subject.topics[0]?.id || ""; }
+      save(); renderAll();
     }else if(act==="open-topic"){
       db.current.subjectId = btn.dataset.sid;
       db.current.topicId = btn.dataset.tid;
@@ -222,17 +233,6 @@ function renderTree(){
     }
   };
 }
-$("#newSubjectBtn").onclick = ()=>{
-  const name = prompt("Subject name"); if(!name) return;
-  db.subjects.push({id:uid(), name, topics:[]});
-  save(); renderAll();
-};
-$("#newTopicBtn").onclick = ()=>{
-  const s = getCurrentSubject(); if(!s){ alert("Create a subject first."); return; }
-  const name = prompt("Topic name"); if(!name) return;
-  s.topics.push({id:uid(), name, spacedActive:false, spacedRoundIndex:0, chunks:[]});
-  save(); renderAll();
-};
 
 /* -------------------- Helpers to find -------------------- */
 function getSubject(id){ return db.subjects.find(x=>x.id===id); }
@@ -244,40 +244,34 @@ function findTopic(topicId){
   }
   return {subject:null, topic:null};
 }
+function getTopic(id){ return findTopic(id).topic; }
 function getCurrentTopic(){ return findTopic(db.current.topicId).topic; }
 
-/* -------------------- Topic View -------------------- */
+/* -------------------- Topic View + Controls -------------------- */
+function mkChunk(name){
+  return {
+    id:uid(), name,
+    phase:"intense",
+    intense:{grid:Array.from({length:3},()=>Array(3).fill(false))},
+    weekbox:{last:"", next:todayISO()},
+    spaced:{index:0, last:"", next:""},
+    history:[]
+  };
+}
+
 function renderTopic(){
   const t = getCurrentTopic();
   const s = getCurrentSubject();
   const title = $("#topicTitle");
-  if(!t){ title.textContent = "No topic selected"; $("#chunks").innerHTML=""; $("#topicControls").innerHTML=""; return; }
+
+  if(!s){ title.textContent = "No subject selected"; $("#topicControls").innerHTML=""; $("#chunks").innerHTML=""; return; }
+  if(!t){ title.textContent = `${s.name} — No topic selected`; $("#topicControls").innerHTML = subjectTopicToolbar(s); $("#chunks").innerHTML=""; wireToolbar(s); return; }
 
   title.textContent = `${s.name} → ${t.name}`;
-  const ctrl = $("#topicControls");
-  ctrl.innerHTML = `
-    <input id="newChunkName" class="input" placeholder="New chunk name" />
-    <button class="btn" id="addChunkBtn">Add Chunk</button>
-    <button class="btn ghost" id="renameTopicBtn">Rename</button>
-    <button class="btn bad" id="clearDoneBtn">Delete Finished (confirm)</button>
-  `;
-  $("#addChunkBtn").onclick = ()=>{
-    const name = $("#newChunkName").value.trim();
-    if(!name) return;
-    t.chunks.push(mkChunk(name));
-    save(); renderAll();
-  };
-  $("#renameTopicBtn").onclick = ()=>{
-    const name = prompt("Rename topic:", t.name); if(name){ t.name=name; save(); renderAll(); }
-  };
-  $("#clearDoneBtn").onclick = ()=>{
-    if(confirm("Delete chunks that finished all spaced rounds?")){
-      t.chunks = t.chunks.filter(c=>!(c.phase==="spaced" && c.spaced.index>=DEFAULT_INTERVALS.length));
-      save(); renderAll();
-    }
-  };
+  $("#topicControls").innerHTML = subjectTopicToolbar(s);
+  wireToolbar(s);
 
-  // list chunks
+  // Chunks list
   const host = $("#chunks");
   host.innerHTML = "";
   if(!t.chunks.length){
@@ -292,34 +286,78 @@ function renderTopic(){
         <h3>${c.name}</h3>
         <div class="row">
           <span class="tag">${c.phase}</span>
-          <button class="btn small ghost" data-act="rename" data-id="${c.id}">✏️</button>
-          <button class="btn small bad" data-act="delete" data-id="${c.id}">🗑</button>
+          <button class="btn small ghost" data-act="rename-chunk" data-id="${c.id}">✏️</button>
+          <button class="btn small bad" data-act="delete-chunk" data-id="${c.id}">🗑</button>
         </div>
       </div>
       <div>${renderChunkPhase(c)}</div>
     `;
-    // wire
     box.onclick = (e)=>{
       const b = e.target.closest("button"); if(!b) return;
-      if(b.dataset.act==="rename"){
-        const name = prompt("Rename chunk:", c.name); if(name){ c.name=name; save(); renderAll(); }
-      }else if(b.dataset.act==="delete"){
-        if(confirm("Delete this chunk?")){
-          t.chunks = t.chunks.filter(x=>x.id!==c.id); save(); renderAll();
-        }
+      const act = b.dataset.act;
+      if(act==="rename-chunk"){
+        const {chunk} = getChunk(b.dataset.id);
+        const name = prompt("Rename chunk:", chunk.name); if(name){ chunk.name=name; save(); renderAll(); }
+      }else if(act==="delete-chunk"){
+        if(!confirm("Delete this chunk?")) return;
+        const {topic} = getChunk(b.dataset.id);
+        topic.chunks = topic.chunks.filter(x=>x.id!==b.dataset.id);
+        save(); renderAll();
       }
     };
     host.appendChild(box);
   });
 
-  // WeekBox → Spaced activation check
   maybeActivateSpaced(t);
+}
+
+function subjectTopicToolbar(subject){
+  return `
+    <input id="newChunkName" class="input" placeholder="New chunk name" />
+    <button class="btn" id="addChunkBtn">Add Chunk</button>
+    <div style="flex:1"></div>
+    <input id="newTopicName" class="input" placeholder="New topic name" />
+    <button class="btn ghost" id="addTopicBtn">+ Topic</button>
+    <button class="btn ghost" id="bulkTopicsBtn">Bulk Topics</button>
+  `;
+}
+function wireToolbar(subject){
+  const t = getCurrentTopic();
+
+  $("#addChunkBtn").onclick = ()=>{
+    const name = $("#newChunkName").value.trim(); if(!name){ alert("Enter chunk name"); return; }
+    t.chunks.push(mkChunk(name)); save(); renderAll();
+  };
+  $("#addTopicBtn").onclick = ()=>{
+    const name = $("#newTopicName").value.trim(); if(!name){ alert("Enter topic name"); return; }
+    subject.topics.push({id:uid(), name, spacedActive:false, spacedRoundIndex:0, chunks:[]});
+    db.current.topicId = subject.topics[subject.topics.length-1].id;
+    save(); renderAll();
+  };
+  $("#bulkTopicsBtn").onclick = ()=>{
+    const mode = confirm("OK = Paste names (one per line)\nCancel = Create Topic 1..N");
+    if(mode){
+      const text = prompt("Paste topic names, one per line:","");
+      if(!text) return;
+      const names = text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+      if(!names.length) return;
+      names.forEach(n=> subject.topics.push({id:uid(), name:n, spacedActive:false, spacedRoundIndex:0, chunks:[]}));
+    }else{
+      const n = parseInt(prompt("How many topics?","15"),10);
+      if(!n || n<1) return;
+      const base = (prompt("Base name:","Topic")||"Topic").trim();
+      for(let i=1;i<=n;i++){
+        subject.topics.push({id:uid(), name:`${base} ${i}`, spacedActive:false, spacedRoundIndex:0, chunks:[]});
+      }
+    }
+    db.current.topicId = subject.topics[subject.topics.length-1].id;
+    save(); renderAll();
+  };
 }
 
 /* --- chunk phase UIs --- */
 function renderChunkPhase(c){
   if(c.phase==="intense"){
-    // 3 days × 3 times
     let grid = "";
     for(let d=0; d<3; d++){
       grid += `<div><div class="smallmuted" style="margin:6px 0">Day ${d+1}</div>`;
@@ -339,75 +377,55 @@ function renderChunkPhase(c){
       <div class="row">
         <button class="btn small good" data-weekdone="${c.id}">✓ Review today</button>
         <div class="smallmuted">Next due: ${dueTxt}</div>
-      </div>
-      <div class="smallmuted">Week Box = one review per day until ALL chunks of this topic reach Week Box. Then topic enters spaced repetition.</div>
-    `;
+      </div>`;
   }
   // spaced
   const idx = c.spaced.index;
   const finished = idx>=DEFAULT_INTERVALS.length;
-  const label = finished ? "✅ completed rounds" : `${DEFAULT_INTERVALS[idx]}D round`;
+  const label = finished ? "✅ completed" : `${DEFAULT_INTERVALS[idx]}D round`;
   const due = c.spaced.next || todayISO();
   const dueStr = finished ? "—" : niceDate(due);
   return `
     <div class="row">
-      ${finished ? `<span class="tag">28D loop complete</span>` :
+      ${finished ? `<span class="tag">28D complete</span>` :
         `<button class="btn small good" data-spaced="${c.id}">✓ Review (${label})</button>`}
       <div class="smallmuted">Next due: ${finished? "—" : dueStr}</div>
-    </div>
-  `;
+    </div>`;
 }
 
-/* -------------------- Handlers for checkboxes -------------------- */
+/* checkbox & buttons for phases */
 document.addEventListener("change",(e)=>{
   const inp = e.target;
-  // intense checkbox
   if(inp.matches("input[type=checkbox][data-intense]")){
     const id = inp.dataset.intense; const d = +inp.dataset.d; const r = +inp.dataset.r;
-    const {topic, chunk} = getChunk(id);
+    const {chunk} = getChunk(id);
     chunk.intense.grid[d][r] = inp.checked;
-    // if all 9 checked → move to weekbox
-    const done = chunk.intense.grid.flat().every(Boolean);
-    if(done){
-      chunk.phase="weekbox";
-      chunk.weekbox.last = "";
-      chunk.weekbox.next = todayISO();
+    if(chunk.intense.grid.flat().every(Boolean)){
+      chunk.phase="weekbox"; chunk.weekbox.last=""; chunk.weekbox.next=todayISO();
     }
     save(); renderAll();
   }
 });
-
 document.addEventListener("click",(e)=>{
   const b = e.target.closest("button"); if(!b) return;
-  // week box done today
   if(b.dataset.weekdone){
     const {chunk} = getChunk(b.dataset.weekdone);
     const today = todayISO();
     if(chunk.weekbox.last===today){ alert("Already done today."); return; }
-    chunk.weekbox.last = today;
-    chunk.weekbox.next = addDays(today,1);
-    chunk.history.push({t:Date.now(), phase:"weekbox"});
-    save(); renderAll();
+    chunk.weekbox.last = today; chunk.weekbox.next = addDays(today,1);
+    chunk.history.push({t:Date.now(), phase:"weekbox"}); save(); renderAll();
   }
-  // spaced done
   if(b.dataset.spaced){
     const {chunk} = getChunk(b.dataset.spaced);
-    const idx = chunk.spaced.index;
-    if(idx>=DEFAULT_INTERVALS.length){
-      // keep at 28D (repeat) if you want; here we stop incrementing
-      return;
-    }
+    const idx = chunk.spaced.index; if(idx>=DEFAULT_INTERVALS.length) return;
     const today = todayISO();
-    chunk.spaced.last = today;
-    const gap = DEFAULT_INTERVALS[idx];
+    chunk.spaced.last = today; const gap = DEFAULT_INTERVALS[idx];
     chunk.spaced.next = addDays(today, gap);
     chunk.history.push({t:Date.now(), phase:`spaced_${gap}D`});
-    chunk.spaced.index = Math.min(idx+1, DEFAULT_INTERVALS.length); // after 28D, treated as finished
+    chunk.spaced.index = Math.min(idx+1, DEFAULT_INTERVALS.length);
     save(); renderAll();
   }
 });
-
-/* find chunk */
 function getChunk(id){
   for(const subject of db.subjects){
     for(const topic of subject.topics){
@@ -424,13 +442,11 @@ function maybeActivateSpaced(topic){
   const allInWeek = topic.chunks.length>0 && topic.chunks.every(c=>c.phase!=="intense");
   if(allInWeek){
     topic.spacedActive = true;
-    // move all to spaced (start first 1D round as they exit weekbox)
     topic.chunks.forEach(c=>{
       c.phase = "spaced";
       c.spaced.index = 0;
-      c.spaced.next = addDays(todayISO(), DEFAULT_INTERVALS[0]); // first due tomorrow if you review today
+      c.spaced.next = addDays(todayISO(), DEFAULT_INTERVALS[0]);
     });
-    topic.spacedRoundIndex = 0;
     save(); renderAll();
   }
 }
@@ -444,7 +460,6 @@ function renderToday(){
     sub.topics.forEach(t=>{
       t.chunks.forEach(c=>{
         if(c.phase==="intense"){
-          // if any box unchecked today? We simply surface chunk in intense list.
           ctI++; items.push({type:"intense", sub, t, c});
         }else if(c.phase==="weekbox"){
           if(!c.weekbox.next || cmpISO(c.weekbox.next, todayISO())<=0){
@@ -464,29 +479,25 @@ function renderToday(){
   $("#countsSpaced").textContent = `Spaced due: ${ctS}`;
 
   const host = $("#todayList");
-  if(items.length===0){ host.innerHTML = `<div class="smallmuted">Nothing due right now. Add chunks or check back tomorrow.</div>`; return; }
+  if(items.length===0){ host.innerHTML = `<div class="smallmuted">Nothing due now. Add chunks or check back tomorrow.</div>`; return; }
 
   const tbl = document.createElement("table");
   tbl.innerHTML = `<thead>
     <tr style="background:transparent;outline:none">
-      <th>Subject</th><th>Topic</th><th>Chunk</th><th>Phase</th><th>Due / Action</th>
+      <th>Subject</th><th>Topic</th><th>Chunk</th><th>Phase</th><th>Action</th>
     </tr></thead><tbody></tbody>`;
   const tb = tbl.querySelector("tbody");
   items.forEach(x=>{
-    const tr = document.createElement("tr");
+    const tr = document.createElement("tr"); tr.classList.add("today");
     let action = "";
     if(x.type==="intense"){
-      action = `<span class="smallmuted">Open chunk below to tick 3×3 grid</span>`;
-      tr.classList.add("today");
+      action = `<span class="smallmuted">Open chunk below to tick 3×3</span>`;
     }else if(x.type==="weekbox"){
-      action = `<button class="btn small good" data-weekdone="${x.c.id}">✓ Review today</button>`;
-      tr.classList.add("today");
+      action = `<button class="btn small good" data-weekdone="${x.c.id}">✓ Week Box today</button>`;
     }else{
-      action = `<button class="btn small good" data-spaced="${x.c.id}">✓ Review (${DEFAULT_INTERVALS[x.c.spaced.index]}D)</button>`;
-      tr.classList.add("today");
+      action = `<button class="btn small good" data-spaced="${x.c.id}">✓ ${DEFAULT_INTERVALS[x.c.spaced.index]}D</button>`;
     }
-    tr.innerHTML = `<td>${x.sub.name}</td><td>${x.t.name}</td><td>${x.c.name}</td>
-      <td>${x.c.phase}</td><td>${action}</td>`;
+    tr.innerHTML = `<td>${x.sub.name}</td><td>${x.t.name}</td><td>${x.c.name}</td><td>${x.c.phase}</td><td>${action}</td>`;
     tb.appendChild(tr);
   });
   host.innerHTML=""; host.appendChild(tbl);
@@ -509,7 +520,7 @@ function renderSpacedTable(){
   const tbl = document.createElement("table");
   tbl.innerHTML = `<thead>
     <tr style="background:transparent;outline:none">
-      <th>Subject</th><th>Topic</th><th>Chunks (spaced due)</th><th>Finished</th>
+      <th>Subject</th><th>Topic</th><th>Spaced due</th><th>Finished</th>
     </tr></thead><tbody></tbody>`;
   const tb = tbl.querySelector("tbody");
   rows.forEach(r=>{
