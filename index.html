@@ -7,7 +7,8 @@
 <style>
 :root{--bg:#0f1220;--card:#181c2f;--ink:#eef1ff;--muted:#9aa3c7;--line:#2a3052;--ok:#7bd88f;--warn:#ffd166;--bad:#ff7575;--accent:#6ca8ff}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;-webkit-tap-highlight-color:transparent}
 header,footer{padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
 header h1{margin:0;font-size:18px;font-weight:600}
 .wrap{max-width:1200px;margin:0 auto;padding:12px}
@@ -28,15 +29,15 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 .hr{height:1px;background:var(--line);margin:8px 0}
 .empty{color:var(--muted);font-style:italic}
 
-/* --- tick grid --- */
+/* tick grid */
 .chkrow{display:flex;align-items:center;gap:10px;margin:6px 0;-webkit-user-select:none;user-select:none}
 .chklabel{width:42px;text-transform:capitalize;font-size:12px;color:var(--muted)}
-.chkgrid{display:grid;grid-template-columns:repeat(3,34px);gap:10px}
-.tick{width:34px;height:34px;border:1px solid var(--line);border-radius:8px;background:#0f1325;cursor:pointer;touch-action:manipulation}
+.chkgrid{display:grid;grid-template-columns:repeat(3,36px);gap:10px}
+.tick{width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:#0f1325;cursor:pointer;touch-action:manipulation}
 .tick[aria-pressed="true"]{background:var(--ok)}
-.tick[disabled]{opacity:.4;cursor:not-allowed}
+.tick[disabled]{opacity:.45;cursor:not-allowed}
 .tick:focus{outline:2px solid #4c7cf7;outline-offset:2px}
-.count{font-size:12px;color:var(--muted)}
+.count{font-size:12px;color:var(--muted);min-width:28px}
 </style>
 </head>
 <body>
@@ -74,11 +75,11 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
   </section>
 </div>
 
-<footer class="wrap small">Calendar-day scheduling: next due is set to midnight of the due day.</footer>
+<footer class="wrap small">Calendar-day scheduling: next due is midnight of the due day.</footer>
 
 <script>
-/* ========== storage & date helpers ========== */
-const LSK="mem_spaced_v7";
+/* ===== helpers ===== */
+const LSK="mem_spaced_v8";
 const now=()=>new Date();
 const ymd=(d=now())=>d.toISOString().slice(0,10);
 const atMidnight=d=>new Date(ymd(d));
@@ -91,7 +92,7 @@ const PERPETUAL_GAP=7;
 
 function save(){localStorage.setItem(LSK,JSON.stringify(DB));renderAll();}
 
-/* ========== models ========== */
+/* ===== model ===== */
 function createSubject(name){return{id:crypto.randomUUID(),name,topics:[]};}
 function createTopic(name){return{id:crypto.randomUUID(),name,chunks:[]};}
 function createChunk(name){
@@ -105,11 +106,11 @@ function createChunk(name){
   };
 }
 
-/* ========== dom refs ========== */
+/* ===== dom ===== */
 const $=(s,el=document)=>el.querySelector(s);
 const subjectsEl=$("#subjects"), todayDateEl=$("#todayDate"), dueCountsEl=$("#dueCounts"), todayTbody=$("#todayTable tbody"), workArea=$("#workArea");
 
-/* ========== render ========== */
+/* ===== render ===== */
 function renderAll(){todayDateEl.textContent=`— ${ymd(now())}`; renderSubjects(); renderToday();}
 
 function renderSubjects(){
@@ -150,16 +151,8 @@ function renderSubjects(){
             <button class="btn" data-act="add-chunk">+ Chunk</button>
             <button class="btn ghost" data-act="bulk-demo">+ Demo 2 chunks</button>
           </div>`;
-        ti.addEventListener("pointerup",(e)=>{
-          const btn=e.target.closest("[data-act]"); if(!btn) return;
-          const act=btn.dataset.act;
-          if(act==="open-topic") openTopic(sub.id,t.id);
-          if(act==="rename-topic"){const n=prompt("Rename topic",t.name); if(n){t.name=n; save();}}
-          if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){sub.topics=sub.topics.filter(x=>x.id!==t.id); save();}}
-          if(act==="add-chunk"){const n=$(".chunk-name",ti).value.trim(); if(!n) return; t.chunks.push(createChunk(n)); save();}
-          if(act==="bulk-demo"){t.chunks.push(createChunk("A1"),createChunk("A2")); save();}
-        });
-        wrap.appendChild(ti);
+        ti.addEventListener("pointerup",onAct(sub,t));
+        wrap.append(ti);
       });
     }
     li.addEventListener("pointerup",(e)=>{
@@ -169,11 +162,22 @@ function renderSubjects(){
       if(act==="del-sub"){if(confirm("Delete subject and EVERYTHING?")){DB.subjects=DB.subjects.filter(x=>x.id!==sub.id); save();}}
       if(act==="add-topic"){const n=$(".topic-name",li).value.trim(); if(!n) return; sub.topics.push(createTopic(n)); save();}
     });
-    subjectsEl.appendChild(li);
+    subjectsEl.append(li);
   });
 }
+function onAct(sub, t){
+  return (e)=>{
+    const btn=e.target.closest("[data-act]"); if(!btn) return;
+    const act=btn.dataset.act;
+    if(act==="open-topic") openTopic(sub.id,t.id);
+    if(act==="rename-topic"){const n=prompt("Rename topic",t.name); if(n){t.name=n; save();}}
+    if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){sub.topics=sub.topics.filter(x=>x.id!==t.id); save();}}
+    if(act==="add-chunk"){const n=$(".chunk-name",e.currentTarget).value.trim(); if(!n) return; t.chunks.push(createChunk(n)); save();}
+    if(act==="bulk-demo"){t.chunks.push(createChunk("B1"),createChunk("B2")); save();}
+  };
+}
 
-function openTopic(subId, topicId){
+function openTopic(subId,topicId){
   const sub=DB.subjects.find(s=>s.id===subId); const topic=sub?.topics.find(t=>t.id===topicId);
   if(!topic){workArea.textContent="Topic not found"; return;}
   workArea.classList.remove("empty");
@@ -198,41 +202,45 @@ function openTopic(subId, topicId){
       </div>
       ${renderChunkBody(ch)}`;
     attachChunkHandlers(card, topic, ch);
-    container.appendChild(card);
+    container.append(card);
   });
 }
 
 function phaseLabel(ch){return ch.phase==="intense"?"intense":ch.phase==="week_streak"?"week-streak":ch.phase==="spaced"?"spaced":"weekly";}
 function phaseClass(ch){return ch.phase==="intense"?"state-intense":ch.phase==="week_streak"?"state-streak":ch.phase==="spaced"?"state-spaced":"state-weekly";}
 
-function dayDone(arr){return arr.filter(Boolean).length===3;}
-function canWorkDay(ch, day){
+function dayCount(arr){return arr.filter(Boolean).length;}
+function dayDone(arr){return dayCount(arr)===3;}
+function canWorkDay(ch,day){
   if(day==="day1") return true;
   if(day==="day2") return dayDone(ch.intense.day1);
   if(day==="day3") return dayDone(ch.intense.day2);
   return true;
 }
-
 function renderChkRow(ch, dayKey, arr){
-  const disabled = !canWorkDay(ch, dayKey);
-  const count = arr.filter(Boolean).length;
+  const count = dayCount(arr);
+  const dayEnabled = canWorkDay(ch, dayKey);
+  // Exact-3 rule: if already 3/3, disable only the unchecked ones (you can untick checked)
+  const disableUnchecked = (count>=3);
   return `
     <div class="chkrow">
       <span class="chklabel">${dayKey}</span>
       <div class="chkgrid">
-        ${arr.map((v,i)=>`<button type="button" class="tick" aria-pressed="${v}" ${disabled?'disabled':''} data-act="tick:${dayKey}:${i}"></button>`).join("")}
+        ${arr.map((v,i)=>{
+          const dis = (!dayEnabled) || (!v && disableUnchecked);
+          return `<button type="button" class="tick" aria-pressed="${v}" ${dis?'disabled':''} data-act="tick:${dayKey}:${i}"></button>`;
+        }).join("")}
       </div>
       <span class="count">${count}/3</span>
     </div>`;
 }
-
 function renderChunkBody(ch){
   if(ch.phase==="intense"){
     return `
       <div class="small" style="margin-bottom:6px">Complete 3×3 over 3 calendar days. Day-2 unlocks after Day-1 is 3/3; Day-3 unlocks after Day-2 is 3/3.</div>
-      ${renderChkRow(ch, "day1", ch.intense.day1)}
-      ${renderChkRow(ch, "day2", ch.intense.day2)}
-      ${renderChkRow(ch, "day3", ch.intense.day3)}
+      ${renderChkRow(ch,"day1",ch.intense.day1)}
+      ${renderChkRow(ch,"day2",ch.intense.day2)}
+      ${renderChkRow(ch,"day3",ch.intense.day3)}
     `;
   }
   if(ch.phase==="week_streak"){
@@ -271,44 +279,50 @@ function renderChunkBody(ch){
   return "";
 }
 
-/* ========== handlers with tap-lock (prevents double toggles on iPad) ========== */
-let TAP_LOCK=false, TAP_LOCK_MS=220;
-function withTapLock(fn){
-  if(TAP_LOCK) return;
-  TAP_LOCK=true; setTimeout(()=>TAP_LOCK=false, TAP_LOCK_MS);
-  fn();
-}
+/* ===== robust tap handling ===== */
+let ACTIVE_POINTER=null;          // pointerId we accept for the current tap
+const TAP_RESET_MS=180;
 
 function attachChunkHandlers(card, topic, ch){
+  card.addEventListener("pointerdown",(e)=>{
+    // Avoid scroll -> click race on iPad
+    if(!e.isPrimary) return;
+    ACTIVE_POINTER=e.pointerId;
+    e.preventDefault();
+  }, {capture:true});
+
   card.addEventListener("pointerup",(e)=>{
-    const btn=e.target.closest("[data-act]"); if(!btn) return;
+    if(ACTIVE_POINTER===null || e.pointerId!==ACTIVE_POINTER) return;
+    const btn=e.target.closest("[data-act]"); if(!btn){ACTIVE_POINTER=null; return;}
     const act=btn.dataset.act;
 
-    if(act==="rename"){const nm=prompt("Rename chunk",ch.name); if(nm){ch.name=nm; save();} return;}
-    if(act==="del"){if(confirm("Delete this chunk?")){topic.chunks=topic.chunks.filter(x=>x.id!==ch.id); save();} return;}
+    const commit=()=>{save(); setTimeout(()=>{ACTIVE_POINTER=null;}, TAP_RESET_MS);};
+
+    if(act==="rename"){const nm=prompt("Rename chunk",ch.name); if(nm){ch.name=nm; commit();} else {ACTIVE_POINTER=null;} return;}
+    if(act==="del"){if(confirm("Delete this chunk?")){topic.chunks=topic.chunks.filter(x=>x.id!==ch.id); commit();} else {ACTIVE_POINTER=null;} return;}
 
     if(act.startsWith("tick:")){
-      withTapLock(()=>{
-        const [_,day,idx]=act.split(":");
-        if(!canWorkDay(ch, day)) return;                // guard
-        const i=+idx; ch.intense[day][i]=!ch.intense[day][i];
-        save();
-        if(intenseDone(ch)){ startWeekStreak(ch); save(); }
-      });
-      return;
+      const [_,day,idx]=act.split(":");
+      if(!canWorkDay(ch,day)){ACTIVE_POINTER=null; return;}
+      const i=+idx;
+      const arr=ch.intense[day];
+      // enforce exact-3 rule
+      const c=dayCount(arr);
+      if(!arr[i] && c>=3){ACTIVE_POINTER=null; return;} // ignore extra checks
+      arr[i]=!arr[i];
+      // if all 3 days done → move to Week-Streak
+      if(["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean))) startWeekStreak(ch);
+      commit(); return;
     }
 
-    if(act==="review-week-streak"){ withTapLock(()=>{doWeekStreakReview(ch); save();}); return; }
-    if(act==="review-spaced"){       withTapLock(()=>{doSpacedReview(ch); save();}); return; }
-    if(act==="review-weekly"){       withTapLock(()=>{doWeeklyReview(ch); save();}); return; }
-    if(act==="force-due"){           withTapLock(()=>{if(ch.phase==="spaced") ch.spaced.nextDue=ymd(now()); if(ch.phase==="weekly") ch.weekly.nextDue=ymd(now()); save();}); return; }
+    if(act==="review-week-streak"){doWeekStreakReview(ch); commit(); return;}
+    if(act==="review-spaced"){doSpacedReview(ch); commit(); return;}
+    if(act==="review-weekly"){doWeeklyReview(ch); commit(); return;}
+    if(act==="force-due"){if(ch.phase==="spaced") ch.spaced.nextDue=ymd(now()); if(ch.phase==="weekly") ch.weekly.nextDue=ymd(now()); commit(); return;}
   });
 }
 
-/* ========== phase logic ========== */
-function intenseDone(ch){
-  return ["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean));
-}
+/* ===== phase logic ===== */
 function startWeekStreak(ch){
   ch.phase="week_streak";
   ch.weekStreak={streak:0,lastDay:null};
@@ -338,13 +352,13 @@ function doSpacedReview(ch){
     const ng=SCHEDULE_GROUPS[ch.spaced.groupIndex];
     if(ng) ch.spaced.nextDue=ymd(addDays(now(),ng.gap));
     else { ch.phase="weekly"; ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP)); }
-  }else{
+  } else {
     ch.spaced.nextDue=ymd(addDays(now(),g.gap));
   }
 }
 function doWeeklyReview(ch){ ch.lastReviewed=ymd(now()); ch.weekly.nextDue=ymd(addDays(now(),PERPETUAL_GAP)); }
 
-/* ========== Today ========== */
+/* ===== Today ===== */
 function collectDue(){
   const out=[];
   DB.subjects.forEach(sub=>sub.topics.forEach(topic=>topic.chunks.forEach(ch=>{
@@ -375,18 +389,16 @@ function renderToday(){
       const btn=e.target.closest("[data-act]"); if(!btn){openTopic(sub.id,topic.id);return;}
       const [kind,sid,tid,cid]=btn.dataset.act.split(":");
       const S=DB.subjects.find(x=>x.id===sid), T=S.topics.find(x=>x.id===tid), C=T.chunks.find(x=>x.id===cid);
-      withTapLock(()=>{
-        if(kind==="go-week") doWeekStreakReview(C);
-        if(kind==="go-spaced") doSpacedReview(C);
-        if(kind==="go-weekly") doWeeklyReview(C);
-        save();
-      });
+      if(kind==="go-week") doWeekStreakReview(C);
+      if(kind==="go-spaced") doSpacedReview(C);
+      if(kind==="go-weekly") doWeeklyReview(C);
+      save();
     });
-    todayTbody.appendChild(tr);
+    todayTbody.append(tr);
   });
 }
 
-/* ========== import / export / bootstrap ========== */
+/* ===== import/export & bootstrap ===== */
 $("#exportJson").addEventListener("pointerup",()=>{
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
@@ -400,8 +412,8 @@ $("#importFile").addEventListener("change",(e)=>{
 $("#addSubject").addEventListener("pointerup",()=>{const n=$("#newSubject").value.trim(); if(!n) return; DB.subjects.push(createSubject(n)); $("#newSubject").value=""; save();});
 
 if(DB.subjects.length===0){
-  const s=createSubject("History"); const t=createTopic("C1");
-  t.chunks.push(createChunk("A1"),createChunk("A2"),createChunk("A3"));
+  const s=createSubject("History"); const t=createTopic("V1");
+  t.chunks.push(createChunk("B1"),createChunk("B2"),createChunk("B3"));
   s.topics.push(t); DB.subjects.push(s); save();
 }else{renderAll();}
 </script>
