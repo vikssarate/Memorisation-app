@@ -37,6 +37,12 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
 .tick:disabled{opacity:.45;cursor:not-allowed}
 .tick:focus{outline:2px solid #4c7cf7;outline-offset:2px}
 .count{font-size:12px;color:var(--muted);min-width:28px}
+
+/* Accordion helpers */
+.caret{display:inline-block;transition:transform .15s ease;margin-right:6px}
+.caret.rot{transform:rotate(90deg)}
+.subj-head,.topic-head{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}
+.chunk-pill{padding:4px 8px;border:1px solid var(--line);border-radius:8px;font-size:12px;display:inline-block;margin:4px 6px 0 0}
 </style>
 </head>
 <body>
@@ -97,6 +103,9 @@ function isPastOrToday(ymd){
 
 let DB=JSON.parse(localStorage.getItem(LSK)||'{"subjects":[]}');
 
+/* UI expand/collapse state (not exported) */
+const UI = { sub: new Map(), topic: new Map() };
+
 const SCHEDULE_GROUPS=[{gap:1,reps:6},{gap:2,reps:6},{gap:3,reps:5},{gap:4,reps:4},{gap:8,reps:4},{gap:16,reps:3},{gap:28,reps:2}];
 const PERPETUAL_GAP=7;
 
@@ -124,7 +133,6 @@ function startWeekStreak(ch){
   ch.spaced.groupIndex=0; ch.spaced.repsDoneInGroup=0; ch.spaced.nextDue=ymdLocal(addDays(new Date(),1));
 }
 function normalizeChunk(ch){
-  // If 9/9 in intense but still marked intense -> promote
   if(ch.phase==="intense" && intenseDone(ch)){ startWeekStreak(ch); }
 }
 
@@ -135,64 +143,114 @@ const subjectsEl=$("#subjects"), todayDateEl=$("#todayDate"), dueCountsEl=$("#du
 /* ===== RENDER ===== */
 function renderAll(){ todayDateEl.textContent=`— ${todayYMD()}`; renderSubjects(); renderToday(); }
 
+/* Accordion Subjects → Topics → Chunks */
 function renderSubjects(){
   subjectsEl.innerHTML="";
   if(DB.subjects.length===0){subjectsEl.innerHTML='<div class="empty">No subjects yet. Add one above.</div>';return;}
+
   DB.subjects.forEach(sub=>{
     const li=document.createElement("li"); li.className="subject-item";
-    li.innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span class="title" style="font-weight:600">${sub.name}</span>
+    const subOpen = UI.sub.get(sub.id) ?? true;
+
+    li.innerHTML = `
+      <div class="subj-head" data-act="toggle-sub" data-id="${sub.id}">
+        <div><span class="caret ${subOpen?'rot':''}">▶</span><span class="title" style="font-weight:600">${sub.name}</span></div>
         <span style="display:flex;gap:6px">
-          <button class="btn alt" data-act="rename-sub">Rename</button>
-          <button class="btn danger" data-act="del-sub">Delete</button>
+          <button class="btn alt" data-act="rename-sub" data-id="${sub.id}">Rename</button>
+          <button class="btn danger" data-act="del-sub" data-id="${sub.id}">Delete</button>
         </span>
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <input type="text" placeholder="New topic name" class="topic-name"/>
-        <button class="btn" data-act="add-topic">+ Topic</button>
+
+      <div class="sub-body" style="margin-top:8px; ${subOpen?'':'display:none'}">
+        <div style="display:flex;gap:8px">
+          <input type="text" placeholder="New topic name" class="topic-name"/>
+          <button class="btn" data-act="add-topic" data-id="${sub.id}">+ Topic</button>
+        </div>
+        <div class="hr"></div>
+        <div class="list" data-topics></div>
       </div>
-      <div class="hr"></div>
-      <div class="list" data-topics></div>`;
-    const wrap=$("[data-topics]",li);
-    if(sub.topics.length===0){wrap.innerHTML='<div class="empty">No topics.</div>';}
-    else{
+    `;
+
+    const topicsWrap = li.querySelector("[data-topics]");
+    if(sub.topics.length===0){
+      topicsWrap.innerHTML = '<div class="empty">No topics.</div>';
+    }else{
       sub.topics.forEach(t=>{
+        const key = `${sub.id}:${t.id}`;
+        const tOpen = UI.topic.get(key) ?? false;
+
         const ti=document.createElement("div"); ti.className="topic-item";
-        ti.innerHTML=`
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span><strong>${t.name}</strong> <span class="small">(${t.chunks.length} chunks)</span></span>
+        ti.innerHTML = `
+          <div class="topic-head" data-act="toggle-topic" data-sub="${sub.id}" data-topic="${t.id}">
+            <div><span class="caret ${tOpen?'rot':''}">▶</span><strong>${t.name}</strong> <span class="small">(${t.chunks.length} chunks)</span></div>
             <span style="display:flex;gap:6px">
-              <button class="btn alt" data-act="open-topic">Open</button>
-              <button class="btn alt" data-act="rename-topic">Rename</button>
-              <button class="btn danger" data-act="del-topic">Delete</button>
+              <button class="btn alt" data-act="rename-topic" data-sub="${sub.id}" data-topic="${t.id}">Rename</button>
+              <button class="btn danger" data-act="del-topic" data-sub="${sub.id}" data-topic="${t.id}">Delete</button>
             </span>
           </div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <input type="text" placeholder="New chunk name" class="chunk-name"/>
-            <button class="btn" data-act="add-chunk">+ Chunk</button>
-            <button class="btn ghost" data-act="bulk-demo">+ Demo 2 chunks</button>
-          </div>`;
-        ti.addEventListener("click",(e)=>{
-          const btn=e.target.closest("[data-act]"); if(!btn) return;
-          const act=btn.dataset.act;
-          if(act==="open-topic") openTopic(sub.id,t.id);
-          if(act==="rename-topic"){const n=prompt("Rename topic",t.name); if(n){t.name=n; save();}}
-          if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){sub.topics=sub.topics.filter(x=>x.id!==t.id); save();}}
-          if(act==="add-chunk"){const n=$(".chunk-name",ti).value.trim(); if(!n) return; t.chunks.push(createChunk(n)); save();}
-          if(act==="bulk-demo"){t.chunks.push(createChunk("D"),createChunk("E")); save();}
-        });
-        wrap.append(ti);
+
+          <div class="topic-body" style="${tOpen?'':'display:none'}">
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <input type="text" placeholder="New chunk name" class="chunk-name"/>
+              <button class="btn" data-act="add-chunk" data-sub="${sub.id}" data-topic="${t.id}">+ Chunk</button>
+              <button class="btn ghost" data-act="bulk-demo" data-sub="${sub.id}" data-topic="${t.id}">+ Demo 2 chunks</button>
+            </div>
+            <div style="margin-top:8px" data-chunks></div>
+          </div>
+        `;
+
+        const chunkWrap = ti.querySelector("[data-chunks]");
+        if(t.chunks.length===0){
+          chunkWrap.innerHTML = '<div class="empty">No chunks yet.</div>';
+        }else{
+          chunkWrap.innerHTML = t.chunks.map(ch => `
+            <button class="chunk-pill" data-act="open-chunk" data-sub="${sub.id}" data-topic="${t.id}" data-ch="${ch.id}">
+              ${ch.name}
+            </button>
+          `).join("");
+        }
+
+        topicsWrap.appendChild(ti);
       });
     }
+
     li.addEventListener("click",(e)=>{
       const btn=e.target.closest("[data-act]"); if(!btn) return;
       const act=btn.dataset.act;
-      if(act==="rename-sub"){const n=prompt("Rename subject",sub.name); if(n){sub.name=n; save();}}
-      if(act==="del-sub"){if(confirm("Delete subject and EVERYTHING?")){DB.subjects=DB.subjects.filter(x=>x.id!==sub.id); save();}}
-      if(act==="add-topic"){const n=$(".topic-name",li).value.trim(); if(!n) return; sub.topics.push(createTopic(n)); save();}
+
+      if(act==="toggle-sub"){
+        const id=btn.dataset.id;
+        UI.sub.set(id, !(UI.sub.get(id) ?? true));
+        renderSubjects();
+        return;
+      }
+      if(act==="toggle-topic"){
+        const sid=btn.dataset.sub, tid=btn.dataset.topic;
+        const key=`${sid}:${tid}`;
+        UI.topic.set(key, !(UI.topic.get(key) ?? false));
+        renderSubjects();
+        return;
+      }
+
+      const sid = btn.dataset.id || btn.dataset.sub;
+      const subRef = DB.subjects.find(s=>s.id===sid);
+
+      if(act==="rename-sub"){const n=prompt("Rename subject",subRef.name); if(n){subRef.name=n; save();} return;}
+      if(act==="del-sub"){if(confirm("Delete subject and EVERYTHING?")){DB.subjects=DB.subjects.filter(x=>x.id!==sid); save();} return;}
+      if(act==="add-topic"){const n=li.querySelector(".topic-name").value.trim(); if(!n) return; subRef.topics.push(createTopic(n)); save(); return;}
+
+      if(act==="rename-topic"||act==="del-topic"||act==="add-chunk"||act==="bulk-demo"||act==="open-chunk"){
+        const tid=btn.dataset.topic;
+        const topic=subRef.topics.find(t=>t.id===tid);
+        if(act==="rename-topic"){const n=prompt("Rename topic",topic.name); if(n){topic.name=n; save();} return;}
+        if(act==="del-topic"){if(confirm("Delete topic and all its chunks?")){subRef.topics=subRef.topics.filter(x=>x.id!==tid); save();} return;}
+        if(act==="add-chunk"){const n=btn.closest(".topic-body").querySelector(".chunk-name").value.trim(); if(!n) return; topic.chunks.push(createChunk(n)); save(); return;}
+        if(act==="bulk-demo"){topic.chunks.push(createChunk("A1"),createChunk("A2")); save(); return;}
+        if(act==="open-chunk"){openTopic(subRef.id, topic.id); return;}
+      }
     });
-    subjectsEl.append(li);
+
+    subjectsEl.appendChild(li);
   });
 }
 
@@ -210,7 +268,7 @@ function openTopic(subId,topicId){
   const container=$("#chunkList",workArea);
   if(topic.chunks.length===0){container.innerHTML='<div class="empty">No chunks yet.</div>';return;}
   topic.chunks.forEach(ch=>{
-    normalizeChunk(ch); // auto-heal
+    normalizeChunk(ch);
     const card=document.createElement("div"); card.className="card";
     card.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
