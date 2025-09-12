@@ -80,27 +80,25 @@ ul{padding:0;margin:0}.list{display:flex;flex-direction:column;gap:8px;max-heigh
   </section>
 </div>
 
-<footer class="wrap small">Calendar-day scheduling: next due is midnight **local time** of the due day.</footer>
+<footer class="wrap small">Calendar-day scheduling: next due is midnight <b>local time (IST)</b> of the due day.</footer>
 
 <script>
-/* ===== LOCAL-DATE SAFE HELPERS ===== */
-const LSK="mem_spaced_v11";
-const now=()=>new Date();
-// yyyy-mm-dd using LOCAL date (no UTC)
-function ymdLocal(d=now()){
-  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), da=String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${da}`;
+/* ===== IST (New Delhi) DATE HELPERS ===== */
+const TZ="Asia/Kolkata";
+const fmtYMD = d => new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+const todayYMD = ()=> fmtYMD(new Date());
+// Add N days to a YYYY-MM-DD (works across months/years)
+function addDaysYMD(ymd, n){
+  const [y,m,d]=ymd.split('-').map(Number);
+  const t=new Date(Date.UTC(y,m-1,d));
+  t.setUTCDate(t.getUTCDate()+n);
+  return fmtYMD(t);
 }
-const addDays=(d,n)=>{const t=new Date(d.getFullYear(), d.getMonth(), d.getDate()+n); return t;};
-const todayYMD=()=>ymdLocal(now());
-// Compare using local midnight
-function isPastOrToday(ymd){
-  if(!ymd) return true;
-  const due = new Date(ymd+"T00:00:00");   // local midnight
-  const today = new Date(todayYMD()+"T00:00:00");
-  return due.getTime() <= today.getTime();
-}
+// Compare YYYY-MM-DD safely
+function isPastOrToday(ymd){ return !ymd || ymd <= todayYMD(); }
 
+/* ===== STORAGE & CONFIG ===== */
+const LSK="mem_spaced_v11";
 let DB=JSON.parse(localStorage.getItem(LSK)||'{"subjects":[]}');
 
 /* UI expand/collapse state (not exported) */
@@ -118,21 +116,38 @@ function createChunk(name){
   return{
     id:crypto.randomUUID(),name,phase:"intense",created:todayYMD(),
     intense:{day1:[false,false,false],day2:[false,false,false],day3:[false,false,false]},
+    /* Track the calendar day when each Intense day was worked */
+    intenseDates:{day1:null,day2:null,day3:null},
     weekStreak:{streak:0,lastDay:null},
-    spaced:{groupIndex:0,repsDoneInGroup:0,nextDue:ymdLocal(addDays(new Date(),1))},
+    spaced:{groupIndex:0,repsDoneInGroup:0,nextDue:addDaysYMD(todayYMD(),1)},
     weekly:{nextDue:null},
     lastReviewed:null
   };
 }
 
-/* ===== NORMALIZER (auto-heal) ===== */
+/* ===== NORMALIZER (auto-heal & daily reset) ===== */
 function intenseDone(ch){return ["day1","day2","day3"].every(d=>ch.intense[d].every(Boolean));}
 function startWeekStreak(ch){
   ch.phase="week_streak";
   ch.weekStreak={streak:0,lastDay:null};
-  ch.spaced.groupIndex=0; ch.spaced.repsDoneInGroup=0; ch.spaced.nextDue=ymdLocal(addDays(new Date(),1));
+  ch.spaced.groupIndex=0; ch.spaced.repsDoneInGroup=0; ch.spaced.nextDue=addDaysYMD(todayYMD(),1);
+}
+/* Reset any Intense day not completed by yesterday */
+function resetIntenseForNewDay(ch){
+  if(ch.phase!=="intense") return;
+  const t=todayYMD();
+  ["day1","day2","day3"].forEach(key=>{
+    const ticks=ch.intense[key];
+    const done=ticks.filter(Boolean).length===3;
+    const worked=ch.intenseDates?.[key];
+    if(!done && worked && worked!==t){
+      ch.intense[key]=[false,false,false];
+      ch.intenseDates[key]=null;
+    }
+  });
 }
 function normalizeChunk(ch){
+  resetIntenseForNewDay(ch);
   if(ch.phase==="intense" && intenseDone(ch)){ startWeekStreak(ch); }
 }
 
@@ -236,7 +251,7 @@ function renderSubjects(){
       const subRef = DB.subjects.find(s=>s.id===sid);
 
       if(act==="rename-sub"){const n=prompt("Rename subject",subRef.name); if(n){subRef.name=n; save();} return;}
-      if(act==="del-sub"){if(confirm("Delete subject and EVERYTHING?")){DB.subjects=DB.subjects.filter(x=>x.id!==sid); save();} return;}
+      if(act==="del-sub"){if(confirm("Delete subject and EVERYTHING?")){DB.subjects=DB.subjects.filter(x=>x.id!==sub.id); save();} return;}
       if(act==="add-topic"){const n=li.querySelector(".topic-name").value.trim(); if(!n) return; subRef.topics.push(createTopic(n)); save(); return;}
 
       if(act==="rename-topic"||act==="del-topic"||act==="add-chunk"||act==="bulk-demo"||act==="open-chunk"){
@@ -316,14 +331,14 @@ function renderChkRow(ch, dayKey, arr){
 function renderChunkBody(ch){
   if(ch.phase==="intense"){
     return `
-      <div class="small" style="margin-bottom:6px">Complete 3×3 over 3 calendar days. Day-2 unlocks after Day-1 is 3/3; Day-3 unlocks after Day-2 is 3/3.</div>
+      <div class="small" style="margin-bottom:6px">Complete 3×3 over 3 calendar days. Day-2 unlocks after Day-1 is 3/3; Day-3 unlocks after Day-2 is 3/3. <em>Partial days reset at midnight.</em></div>
       ${renderChkRow(ch,"day1",ch.intense.day1)}
       ${renderChkRow(ch,"day2",ch.intense.day2)}
       ${renderChkRow(ch,"day3",ch.intense.day3)}
     `;
   }
   if(ch.phase==="week_streak"){
-    const due=ch.weekStreak.lastDay?ymdLocal(addDays(new Date(ch.weekStreak.lastDay),1)):todayYMD();
+    const due=ch.weekStreak.lastDay?addDaysYMD(ch.weekStreak.lastDay,1):todayYMD();
     const ok=isPastOrToday(due);
     return `
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -374,6 +389,11 @@ function attachChunkHandlers(card, topic, ch){
 
     arr[i]=want;
 
+    /* Stamp/clear the calendar day for this Day-N */
+    if(!ch.intenseDates) ch.intenseDates={day1:null,day2:null,day3:null};
+    if(want && before===0 && !ch.intenseDates[day]) ch.intenseDates[day]=todayYMD();
+    if(!arr.some(Boolean)) ch.intenseDates[day]=null;
+
     const cntEl = card.querySelector(`[data-count="${day}"]`);
     if(cntEl){ cntEl.textContent = `${countTrue(arr)}/3`; }
 
@@ -398,40 +418,40 @@ function attachChunkHandlers(card, topic, ch){
 function doWeekStreakReview(ch){
   const today=todayYMD(), last=ch.weekStreak.lastDay;
   if(last){
-    const expected=ymdLocal(addDays(new Date(last),1));
+    const expected=addDaysYMD(last,1);
     ch.weekStreak.streak = (today===expected)?(ch.weekStreak.streak+1):1;
     ch.weekStreak.lastDay=today;
   } else { ch.weekStreak.streak=1; ch.weekStreak.lastDay=today; }
   if(ch.weekStreak.streak>=3){
     ch.phase="spaced";
     ch.spaced.groupIndex=0; ch.spaced.repsDoneInGroup=0;
-    ch.spaced.nextDue=ymdLocal(addDays(new Date(),SCHEDULE_GROUPS[0].gap));
+    ch.spaced.nextDue=addDaysYMD(todayYMD(),SCHEDULE_GROUPS[0].gap);
   }
 }
 function doSpacedReview(ch){
   const g=SCHEDULE_GROUPS[ch.spaced.groupIndex];
-  if(!g){ ch.phase="weekly"; ch.weekly.nextDue=ymdLocal(addDays(new Date(),PERPETUAL_GAP)); return; }
+  if(!g){ ch.phase="weekly"; ch.weekly.nextDue=addDaysYMD(todayYMD(),PERPETUAL_GAP); return; }
   ch.lastReviewed=todayYMD(); ch.spaced.repsDoneInGroup++;
   if(ch.spaced.repsDoneInGroup>=g.reps){
     ch.spaced.groupIndex++; ch.spaced.repsDoneInGroup=0;
     const ng=SCHEDULE_GROUPS[ch.spaced.groupIndex];
-    if(ng) ch.spaced.nextDue=ymdLocal(addDays(new Date(),ng.gap));
-    else { ch.phase="weekly"; ch.weekly.nextDue=ymdLocal(addDays(new Date(),PERPETUAL_GAP)); }
+    if(ng) ch.spaced.nextDue=addDaysYMD(todayYMD(),ng.gap);
+    else { ch.phase="weekly"; ch.weekly.nextDue=addDaysYMD(todayYMD(),PERPETUAL_GAP); }
   } else {
-    ch.spaced.nextDue=ymdLocal(addDays(new Date(),g.gap));
+    ch.spaced.nextDue=addDaysYMD(todayYMD(),g.gap);
   }
 }
-function doWeeklyReview(ch){ ch.lastReviewed=todayYMD(); ch.weekly.nextDue=ymdLocal(addDays(new Date(),PERPETUAL_GAP)); }
+function doWeeklyReview(ch){ ch.lastReviewed=todayYMD(); ch.weekly.nextDue=addDaysYMD(todayYMD(),PERPETUAL_GAP); }
 
 /* ===== TODAY ===== */
 function collectDue(){
   const out=[];
   DB.subjects.forEach(sub=>sub.topics.forEach(topic=>topic.chunks.forEach(ch=>{
-    normalizeChunk(ch); // auto-heal while scanning
+    normalizeChunk(ch); // auto-heal + reset
     let due=false, phase="";
     if(ch.phase==="intense"){due=true; phase="Intense";}
     else if(ch.phase==="week_streak"){
-      const next=ch.weekStreak.lastDay?ymdLocal(addDays(new Date(ch.weekStreak.lastDay),1)):todayYMD();
+      const next=ch.weekStreak.lastDay?addDaysYMD(ch.weekStreak.lastDay,1):todayYMD();
       due=isPastOrToday(next); phase="Week-Streak";
     } else if(ch.phase==="spaced"){due=isPastOrToday(ch.spaced.nextDue); phase="Spaced";}
     else if(ch.phase==="weekly"){due=isPastOrToday(ch.weekly.nextDue||todayYMD()); phase="Weekly";}
